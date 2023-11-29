@@ -4,6 +4,7 @@ from os import path
 from typing import Optional
 
 import numpy as np
+from scipy.stats import expon
 
 import gym
 from gym import spaces
@@ -92,10 +93,14 @@ class PendulumEnv(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, render_mode: Optional[str] = None, g=10.0):
+    def __init__(self, dt_lambda, render_mode: Optional[str] = None, g=10.0, dt_seed=0):
+        self.dt_seed = dt_seed
+        self.dt_lambda = dt_lambda
+        self._reset_dt_rng()
+
         self.max_speed = 8
         self.max_torque = 2.0
-        self.dt = 0.05
+        self.timestep = 0.005 # different meaning, unit time step here
         self.g = g
         self.m = 1.0
         self.l = 1.0
@@ -116,30 +121,45 @@ class PendulumEnv(gym.Env):
         )
         self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
 
-    def step(self, u):
+    def _reset_dt_rng(self, seed=None):
+        if seed is None:
+            seed = self.dt_seed
+        self.dt_seed = np.random.randint(-10000, 10000, seed=seed)
+        self.dt_expon = expon(scale=1/self.dt_lambda, seed=self.dt_seed)
+
+    def _single_step(self, u, step):
         th, thdot = self.state  # th := theta
 
         g = self.g
         m = self.m
         l = self.l
-        dt = self.dt
 
         u = np.clip(u, -self.max_torque, self.max_torque)[0]
-        self.last_u = u  # for rendering
-        costs = angle_normalize(th) ** 2 + 0.1 * thdot**2 + 0.001 * (u**2)
 
-        newthdot = thdot + (3 * g / (2 * l) * np.sin(th) + 3.0 / (m * l**2) * u) * dt
+        newthdot = thdot + (3 * g / (2 * l) * np.sin(th) + 3.0 / (m * l**2) * u) * step
         newthdot = np.clip(newthdot, -self.max_speed, self.max_speed)
-        newth = th + newthdot * dt
+        newth = th + newthdot * step
 
         self.state = np.array([newth, newthdot])
 
+    def step(self, u):
+        dt = self.dt_expon.rvs()
+        n = int(dt / self.timestep)
+        for _ in range(n):
+            self._single_step(self, u, self.timestep)
+        self._single_step(self, u, dt - self.timestep * n)
+        
+        th, thdot = self.state  # th := theta
+        self.last_u = u  # for rendering
+        costs = angle_normalize(th) ** 2 + 0.1 * thdot**2 + 0.001 * (u**2)
+
         if self.render_mode == "human":
             self.render()
-        return self._get_obs(), -costs, False, False, {}
+        return self._get_obs(), -costs, False, False, {"dt": dt}
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
+        self._reset_dt_rng(seed=seed)
         if options is None:
             high = np.array([DEFAULT_X, DEFAULT_Y])
         else:
