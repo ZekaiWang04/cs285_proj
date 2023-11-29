@@ -6,7 +6,7 @@ import torch
 from typing import Optional, Sequence
 
 
-def mpc_config(
+def ode_config(
     env_name: str,
     exp_name: str,
     learning_rate: float = 1e-3,

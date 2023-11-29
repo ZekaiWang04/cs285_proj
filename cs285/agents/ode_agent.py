@@ -17,6 +17,7 @@ class NeuralODE(nn.Module):
         "identity": nn.Identity(),
     }
     def __init__(self, hidden_dims, ob_dim, ac_dim, activation="relu", output_activation='identity'):
+        super().__init__()
         activation = self._str_to_activation[activation]
         output_activation = self._str_to_activation[output_activation]
         layers = []
@@ -26,11 +27,12 @@ class NeuralODE(nn.Module):
             layers.append(activation)
         layers.append(nn.Linear(hidden_dims[-1], ob_dim))
         layers.append(output_activation)
+        self.net = nn.Sequential(*layers)
+
         for m in self.net.modules():
             if isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, mean=0, std=0.1)
                 nn.init.constant_(m.bias, val=0)
-        self.net = nn.Sequential(*layers)
     
     def update_action(self, action):
         self.register_buffer("ac", action)
@@ -64,7 +66,7 @@ class ODEAgent(nn.Module):
         self.cem_num_iters = cem_num_iters
         self.cem_num_elites = cem_num_elites
         self.cem_alpha = cem_alpha
-        self.register_buffer("timestep", timestep)
+        self.timestep = timestep
 
         assert mpc_strategy in (
             "random",
@@ -91,7 +93,7 @@ class ODEAgent(nn.Module):
                 for _ in range(ensemble_size)
             ]
         )
-        self.optimizer = make_optimizer(self.dynamics_models.parameters())
+        self.optimizer = make_optimizer(self.ode_functions.parameters())
         self.loss_fn = nn.MSELoss()
 
     def update(self, i: int, obs: np.ndarray, acs: np.ndarray, next_obs: np.ndarray, dt: np.ndarray):
