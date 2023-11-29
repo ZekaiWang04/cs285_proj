@@ -253,11 +253,6 @@ class ModelBasedAgent(nn.Module):
                 elite_mean = (1 - self.cem_alpha) * elite_mean + self.cem_alpha * np.mean(top_j_actions, axis=0)
                 elite_std = (1 - self.cem_alpha) * elite_std + self.cem_alpha * np.std(top_j_actions, axis=0)
             return np.clip(elite_mean[0], self.env.action_space.low, self.env.action_space.high)
-            """
-            best_index = np.argsort(rewards)[-1]
-            best_action = action_sequences[best_index]
-            return best_action[0] # techinically this is not cem
-            """
 
         else:
             raise ValueError(f"Invalid MPC strategy '{self.mpc_strategy}'")

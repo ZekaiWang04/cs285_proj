@@ -93,10 +93,9 @@ class PendulumEnv(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, dt_lambda, render_mode: Optional[str] = None, g=10.0, dt_seed=0):
-        self.dt_seed = dt_seed
+    def __init__(self, dt_lambda=1/0.05, render_mode: Optional[str] = None, g=10.0):
         self.dt_lambda = dt_lambda
-        self._reset_dt_rng()
+        self.dt_expon = expon(scale=1/self.dt_lambda)
 
         self.max_speed = 8
         self.max_torque = 2.0
@@ -121,12 +120,6 @@ class PendulumEnv(gym.Env):
         )
         self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
 
-    def _reset_dt_rng(self, seed=None):
-        if seed is None:
-            seed = self.dt_seed
-        self.dt_seed = np.random.randint(-10000, 10000, seed=seed)
-        self.dt_expon = expon(scale=1/self.dt_lambda, seed=self.dt_seed)
-
     def _single_step(self, u, step):
         th, thdot = self.state  # th := theta
 
@@ -146,8 +139,8 @@ class PendulumEnv(gym.Env):
         dt = self.dt_expon.rvs()
         n = int(dt / self.timestep)
         for _ in range(n):
-            self._single_step(self, u, self.timestep)
-        self._single_step(self, u, dt - self.timestep * n)
+            self._single_step(u, self.timestep)
+        self._single_step(u, dt - self.timestep * n)
         
         th, thdot = self.state  # th := theta
         self.last_u = u  # for rendering
@@ -155,11 +148,36 @@ class PendulumEnv(gym.Env):
 
         if self.render_mode == "human":
             self.render()
-        return self._get_obs(), -costs, False, False, {"dt": dt}
+        return self._get_obs(), -costs, False, {"dt": dt}
+    
+    def get_reward(self, observations, actions):
+        self.reward_dict = {}
+        if len(observations.shape) == 1:
+            observations = np.expand_dims(observations, axis=0)
+            actions = np.expand_dims(actions, axis=0)
+            batch_mode = False
+        else:
+            batch_mode = True
+        
+        # get vars
+        cos_theta = observations[:, 0]
+        sin_theta = observations[:, 1]
+        theta_dot = observations[:, 2]
+        u = actions.squeeze()
+        assert u.shape == (observations.shape[0],)
+        # calc rew
+        rewards = -(angle_normalize(np.arctan2(sin_theta, cos_theta)) ** 2 + 0.1 * theta_dot**2 + 0.001 * (u**2))
+
+        # done is always false for this env
+        dones = np.zeros((observations.shape[0],))
+
+        # return
+        if not batch_mode:
+            return rewards[0], dones[0]
+        return rewards, dones
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
-        self._reset_dt_rng(seed=seed)
         if options is None:
             high = np.array([DEFAULT_X, DEFAULT_Y])
         else:
@@ -176,7 +194,7 @@ class PendulumEnv(gym.Env):
 
         if self.render_mode == "human":
             self.render()
-        return self._get_obs(), {}
+        return self._get_obs()
 
     def _get_obs(self):
         theta, thetadot = self.state

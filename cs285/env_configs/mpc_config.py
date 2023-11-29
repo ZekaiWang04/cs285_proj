@@ -34,6 +34,8 @@ def mpc_config(
         ep_len = 500
     if env_name == "obstacles-cs285-v0":
         ep_len = 100
+    if env_name == "pendulum-cs285-v0":
+        ep_len = 200
 
     def make_dynamics_model(ob_dim: int, ac_dim: int) -> nn.Module:
         return ptu.build_mlp(
