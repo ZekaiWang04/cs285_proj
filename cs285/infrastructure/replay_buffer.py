@@ -10,6 +10,7 @@ class ReplayBuffer:
         self.rewards = None
         self.next_observations = None
         self.dones = None
+        self.dts = None
 
     def sample(self, batch_size):
         rand_indices = np.random.randint(0, self.size, size=(batch_size,)) % self.max_size
@@ -19,6 +20,7 @@ class ReplayBuffer:
             "rewards": self.rewards[rand_indices],
             "next_observations": self.next_observations[rand_indices],
             "dones": self.dones[rand_indices],
+            "dt": self.dt[rand_indices]
         }
 
     def __len__(self):
@@ -32,6 +34,7 @@ class ReplayBuffer:
         reward: np.ndarray,
         next_observation: np.ndarray,
         done: np.ndarray,
+        dt: np.ndarray,
     ):
         """
         Insert a single transition into the replay buffer.
@@ -51,6 +54,8 @@ class ReplayBuffer:
             done = np.array(done)
         if isinstance(action, int):
             action = np.array(action, dtype=np.int64)
+        if isinstance(dt, (float, int)):
+            dt = np.array(dt)
 
         if self.observations is None:
             self.observations = np.empty(
@@ -62,18 +67,21 @@ class ReplayBuffer:
                 (self.max_size, *next_observation.shape), dtype=next_observation.dtype
             )
             self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
+            self.dt = np.empty((self.max_size, *dt.shape), dtype=dt.dtype)
 
         assert observation.shape == self.observations.shape[1:]
         assert action.shape == self.actions.shape[1:]
         assert reward.shape == ()
         assert next_observation.shape == self.next_observations.shape[1:]
         assert done.shape == ()
+        assert dt.shape == ()
 
         self.observations[self.size % self.max_size] = observation
         self.actions[self.size % self.max_size] = action
         self.rewards[self.size % self.max_size] = reward
         self.next_observations[self.size % self.max_size] = next_observation
         self.dones[self.size % self.max_size] = done
+        self.dts[self.size % self.max_size] = dt
 
         self.size += 1
 
@@ -85,7 +93,8 @@ class ReplayBuffer:
         rewards: np.ndarray,
         next_observations: np.ndarray,
         dones: np.ndarray,
-            ):
+        dts: np.ndarray
+    ):
         """
         Insert a batch of transitions into the replay buffer.
         """
@@ -104,12 +113,14 @@ class ReplayBuffer:
                 dtype=next_observations.dtype,
             )
             self.dones = np.empty((self.max_size, *dones.shape[1:]), dtype=dones.dtype)
+            self.dts = np.empty((self.max_size, *dts.shape[1:]), dtype=dts.dtype)
 
         assert observations.shape[1:] == self.observations.shape[1:]
         assert actions.shape[1:] == self.actions.shape[1:]
         assert rewards.shape[1:] == self.rewards.shape[1:]
         assert next_observations.shape[1:] == self.next_observations.shape[1:]
         assert dones.shape[1:] == self.dones.shape[1:]
+        assert dts.shape[1:] == self.dts.shape[1:]
 
         indices = np.arange(self.size, self.size + observations.shape[0]) % self.max_size
         self.observations[indices] = observations
@@ -117,5 +128,6 @@ class ReplayBuffer:
         self.rewards[indices] = rewards
         self.next_observations[indices] = next_observations
         self.dones[indices] = dones
+        self.dts[indices] = dts
 
         self.size += observations.shape[0]
