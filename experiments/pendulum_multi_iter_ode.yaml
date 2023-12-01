@@ -1,9 +1,9 @@
-env_name: cheetah-cs285-v0
-exp_name: cheetah_multi
+env_name: pendulum-cs285-v0
+fixed_steps: 10
+exp_name: pendulum_multi_ode
 
-base_config: mpc
-num_layers: 2
-hidden_size: 250
+base_config: ode
+hidden_dims: [128, 128, 128]
 
 num_iters: 15
 initial_batch_size: 5000

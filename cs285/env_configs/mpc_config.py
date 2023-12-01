@@ -9,6 +9,8 @@ from typing import Optional
 def mpc_config(
     env_name: str,
     exp_name: str,
+    dt_lambda: float=1/0.05,
+    fixed_steps: int=None, 
     hidden_size: int = 128,
     num_layers: int = 3,
     learning_rate: float = 1e-3,
@@ -50,7 +52,10 @@ def mpc_config(
 
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
-            gym.make(env_name, render_mode="single_rgb_array" if render else None),
+            gym.make(env_name, 
+                     dt_lambda=dt_lambda,
+                     fixed_steps=fixed_steps,
+                     render_mode="single_rgb_array" if render else None),
         )
 
     log_string = f"{env_name}_{exp_name}_l{num_layers}_h{hidden_size}_mpc{mpc_strategy}_horizon{mpc_horizon}_actionseq{mpc_num_action_sequences}"

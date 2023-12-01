@@ -12,7 +12,7 @@ def make_config(config_file: str) -> dict:
         config_kwargs = yaml.load(f, Loader=yaml.SafeLoader)
 
     base_config_name = config_kwargs.pop("base_config")
-    return cs285.env_configs.configs[base_config_name](**config_kwargs)
+    return cs285.env_configs.configs[base_config_name](**config_kwargs), base_config_name
 
 
 def make_logger(config: dict) -> Logger:

@@ -9,6 +9,8 @@ from typing import Optional, Sequence
 def ode_config(
     env_name: str,
     exp_name: str,
+    dt_lambda: float=1/0.05,
+    fixed_steps: int=None, 
     learning_rate: float = 1e-3,
     ensemble_size: int = 3,
     mpc_horizon: int = 10,
@@ -38,7 +40,10 @@ def ode_config(
 
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
-            gym.make(env_name, render_mode="single_rgb_array" if render else None),
+            gym.make(env_name,
+                     dt_lambda=dt_lambda,
+                     fixed_steps=fixed_steps,
+                     render_mode="single_rgb_array" if render else None),
         )
 
     log_string = f"{env_name}_{exp_name}_hiddendims{hidden_dims}_mpc{mpc_strategy}_horizon{mpc_horizon}_actionseq{mpc_num_action_sequences}"

@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch
 import gym
 from cs285.infrastructure import pytorch_util as ptu
-from torchdiffeq import odeint_adjoint as odeint
+from torchdiffeq import odeint
 
 class NeuralODE(nn.Module):
     _str_to_activation = {

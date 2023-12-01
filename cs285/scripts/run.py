@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import yaml
 from cs285 import envs
 
+from cs285.agents.ode_agent import ODEAgent
 from cs285.agents.model_based_agent import ModelBasedAgent
 from cs285.agents.soft_actor_critic import SoftActorCritic
 from cs285.infrastructure.replay_buffer import ReplayBuffer
@@ -68,7 +69,7 @@ def collect_mbpo_rollout(
 
 
 def run_training_loop(
-    config: dict, logger: Logger, args: argparse.Namespace, sac_config: Optional[dict]
+    config: dict, agent_name: str, logger: Logger, args: argparse.Namespace, sac_config: Optional[dict]
 ):
     # set random seeds
     np.random.seed(args.seed)
@@ -96,7 +97,9 @@ def run_training_loop(
         fps = 2
 
     # initialize agent
-    mb_agent = ModelBasedAgent(
+    AgentClass = {"mpc": ModelBasedAgent,
+                  "ode": ODEAgent}[agent_name]
+    mb_agent = AgentClass(
         env,
         **config["agent_kwargs"],
     )
@@ -178,7 +181,15 @@ def run_training_loop(
             # Use `replay_buffer.sample` with config["train_batch_size"].
             for i in range(mb_agent.ensemble_size):
                 batch = replay_buffer.sample(config["train_batch_size"])
-                loss = mb_agent.update(i, batch["observations"], batch["actions"], batch["next_observations"])
+                if AgentClass == ModelBasedAgent:
+                    loss = mb_agent.update(i, batch["observations"], batch["actions"], batch["next_observations"])
+                elif AgentClass == ODEAgent:
+                    assert env.fixed_steps is not None
+                    batch_size = batch["observations"].shape[0]
+                    dt = np.array([env.fixed_steps * env.timestep] * batch_size)
+                    loss = mb_agent.update(i, batch["observations"], batch["actions"], batch["next_observations"], dt)
+                else:
+                    raise Exception
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
 
@@ -286,15 +297,15 @@ def main():
 
     args = parser.parse_args()
 
-    config = make_config(args.config_file)
+    config, agent_name = make_config(args.config_file)
     logger = make_logger(config)
 
     if args.sac_config_file is not None:
-        sac_config = make_config(args.sac_config_file)
+        sac_config, _ = make_config(args.sac_config_file)
     else:
         sac_config = None
 
-    run_training_loop(config, logger, args, sac_config)
+    run_training_loop(config, agent_name, logger, args, sac_config)
 
 
 if __name__ == "__main__":

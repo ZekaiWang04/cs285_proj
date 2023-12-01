@@ -1,5 +1,7 @@
-env_name: reacher-cs285-v0
-exp_name: reacher_multi
+env_name: pendulum-cs285-v0
+exp_name: pendulum_multi_fixed10steps
+
+fixed_steps: 10
 
 base_config: mpc
 num_layers: 2
@@ -8,7 +10,7 @@ hidden_size: 250
 num_iters: 15
 initial_batch_size: 5000
 batch_size: 5000
-num_agent_train_steps_per_iter: 1000
+num_agent_train_steps_per_iter: 1500
 num_eval_trajectories: 10
-mpc_horizon: 10
+mpc_horizon: 15
 mpc_strategy: random
