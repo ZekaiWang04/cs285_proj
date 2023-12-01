@@ -111,6 +111,7 @@ class ODEAgent(nn.Module):
         obs = ptu.from_numpy(obs)
         acs = ptu.from_numpy(acs)
         next_obs = ptu.from_numpy(next_obs)
+        dt = ptu.from_numpy(dt)
         predicted_obs = torch.zeros(next_obs.shape)
         steps = torch.floor(dt / self.timestep) + 1
         steps = steps.to(int)
