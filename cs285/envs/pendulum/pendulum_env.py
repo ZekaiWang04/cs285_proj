@@ -93,9 +93,16 @@ class PendulumEnv(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, dt_lambda=1/0.05, render_mode: Optional[str] = None, g=10.0):
+    def __init__(
+            self, 
+            fixed_steps=None,
+            dt_lambda=1/0.05, 
+            render_mode: Optional[str] = None, 
+            g=10.0
+        ):
         self.dt_lambda = dt_lambda
         self.dt_expon = expon(scale=1/self.dt_lambda)
+        self.fixed_steps = fixed_steps
 
         self.max_speed = 8
         self.max_torque = 2.0
@@ -136,7 +143,7 @@ class PendulumEnv(gym.Env):
         self.state = np.array([newth, newthdot])
 
     def step(self, u):
-        dt = self.dt_expon.rvs()
+        dt = self.dt_expon.rvs() if self.fixed_steps is None else self.fixed_steps * self.timestep
         n = int(dt / self.timestep)
         for _ in range(n):
             self._single_step(u, self.timestep)
