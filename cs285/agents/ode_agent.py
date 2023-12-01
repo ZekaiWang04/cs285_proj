@@ -137,7 +137,7 @@ class ODEAgent(nn.Module):
         obs = ptu.from_numpy(obs)
         acs = ptu.from_numpy(acs)
         t = torch.linspace(0, self.mpc_horizon * self.timestep, self.mpc_horizon + 1, device=ptu.device)
-        reward_arr = np.zeros(self.mpc_num_action_sequences, self.ensemble_size)
+        reward_arr = np.zeros((self.mpc_num_action_sequences, self.ensemble_size))
         for n in range(self.mpc_num_action_sequences):
             for i in range(self.ensemble_size):
                 ode_func = self.ode_functions[i]
