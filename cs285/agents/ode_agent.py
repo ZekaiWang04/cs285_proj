@@ -38,7 +38,7 @@ class NeuralODE(nn.Module):
         self.register_buffer("ac", action)
 
     def forward(self, t, y):
-        return self.net(torch.cat(y, self.ac))
+        return self.net(torch.cat((y, self.ac), dim=-1))
 
     
 class ODEAgent(nn.Module):
@@ -89,7 +89,7 @@ class ODEAgent(nn.Module):
                     self.ac_dim,
                     activation,
                     output_activation
-                )
+                ).to(ptu.device)
                 for _ in range(ensemble_size)
             ]
         )
@@ -112,13 +112,13 @@ class ODEAgent(nn.Module):
         acs = ptu.from_numpy(acs)
         next_obs = ptu.from_numpy(next_obs)
         dt = ptu.from_numpy(dt)
-        predicted_obs = torch.zeros(next_obs.shape)
+        predicted_obs = torch.zeros(next_obs.shape, device=ptu.device)
         steps = torch.floor(dt / self.timestep) + 1
         steps = steps.to(int)
         ode_func = self.ode_functions[i]
         for n in range(batch_size):
-            self.ode_func.update_action(acs[n, :])
-            t = torch.linspace(0, dt[n], steps[n])
+            ode_func.update_action(acs[n, :])
+            t = torch.linspace(0, dt[n], steps[n], device=ptu.device)
             ode_out = odeint(ode_func, obs[n, :], t)
             predicted_obs[n, :] = ode_out[-1, :]
         loss = self.loss_fn(next_obs, predicted_obs)
@@ -136,7 +136,7 @@ class ODEAgent(nn.Module):
     def evaluate_action_sequences(self, obs: np.ndarray, acs: np.ndarray):
         obs = ptu.from_numpy(obs)
         acs = ptu.from_numpy(acs)
-        t = torch.linspace(0, self.mpc_horizon * self.timestep, self.mpc_horizon + 1)
+        t = torch.linspace(0, self.mpc_horizon * self.timestep, self.mpc_horizon + 1, device=ptu.device)
         reward_arr = np.zeros(self.mpc_num_action_sequences, self.ensemble_size)
         for n in range(self.mpc_num_action_sequences):
             for i in range(self.ensemble_size):
