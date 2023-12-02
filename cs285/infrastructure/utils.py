@@ -7,6 +7,8 @@ import cv2
 from cs285.infrastructure import pytorch_util as ptu
 from typing import Dict, Tuple, List
 
+from tqdm import trange
+
 ############################################
 ############################################
 
@@ -107,7 +109,7 @@ def sample_n_trajectories(
 ):
     """Collect ntraj rollouts."""
     trajs = []
-    for i in range(ntraj):
+    for i in trange(ntraj):
         # collect rollout
         traj = sample_trajectory(env, policy, max_length, render)
         trajs.append(traj)

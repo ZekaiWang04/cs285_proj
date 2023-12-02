@@ -141,10 +141,10 @@ class ODEAgent(nn.Module):
         for n in range(self.mpc_num_action_sequences):
             for i in range(self.ensemble_size):
                 ode_func = self.ode_functions[i]
-                ode_func.update_action(ptu.from_numpy(acs[n, :]))
+                ode_func.update_action(acs[n, :])
                 ode_out = odeint(ode_func, obs, t) # (self.mpc_horizon + 1, ob_dim)
                 assert ode_out.shape[0] == self.mpc_horizon + 1
-                rewards = self.env.get_reward(ptu.to_numpy(ode_out), ptu.to_numpy(acs.repeat(self.mpc_horizon + 1, 1)))
+                rewards = self.env.get_reward(ptu.to_numpy(ode_out), ptu.to_numpy(acs[n, :].repeat(self.mpc_horizon + 1, 1)))
                 avg_reward = np.mean(rewards)
                 reward_arr[n, i] = avg_reward
         return np.mean(reward_arr, axis=1)

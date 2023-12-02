@@ -171,7 +171,7 @@ class PendulumEnv(gym.Env):
         sin_theta = observations[:, 1]
         theta_dot = observations[:, 2]
         u = actions.squeeze()
-        assert u.shape == (observations.shape[0],)
+        assert u.shape == (observations.shape[0],), f"u.shape={u.shape}, observations.shape={observations.shape}"
         # calc rew
         rewards = -(angle_normalize(np.arctan2(sin_theta, cos_theta)) ** 2 + 0.1 * theta_dot**2 + 0.001 * (u**2))
 

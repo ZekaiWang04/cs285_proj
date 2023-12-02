@@ -59,13 +59,7 @@ def run_training_loop(
     else:
         fps = 2
 
-    # initialize agent
-    AgentClass = {"mpc": ModelBasedAgent,
-                  "ode": ODEAgent}[agent_name]
-    mb_agent = AgentClass(
-        env,
-        **config["agent_kwargs"],
-    )
+    mb_agent=utils.RandomPolicy(env=env)
     actor_agent = mb_agent
 
     replay_buffer = ReplayBuffer(config["replay_buffer_capacity"])
@@ -103,49 +97,9 @@ def run_training_loop(
                 dones=traj["done"],
             )
 
-        # update agent's statistics with the entire replay buffer
-        mb_agent.update_statistics(
-            obs=replay_buffer.observations[: len(replay_buffer)],
-            acs=replay_buffer.actions[: len(replay_buffer)],
-            next_obs=replay_buffer.next_observations[: len(replay_buffer)],
-        )
 
         # train agent
         print("Training agent...")
-        all_losses = []
-        for _ in tqdm.trange(
-            config["num_agent_train_steps_per_iter"], dynamic_ncols=True
-        ):
-            step_losses = []
-            # TODO(student): train the dynamics models
-            # HINT: train each dynamics model in the ensemble with a *different* batch of transitions!
-            # Use `replay_buffer.sample` with config["train_batch_size"].
-            for i in range(mb_agent.ensemble_size):
-                batch = replay_buffer.sample(config["train_batch_size"])
-                if AgentClass == ModelBasedAgent:
-                    loss = mb_agent.update(i, batch["observations"], batch["actions"], batch["next_observations"])
-                elif AgentClass == ODEAgent:
-                    assert env.fixed_steps is not None
-                    batch_size = batch["observations"].shape[0]
-                    dt = np.array([env.fixed_steps * env.timestep] * batch_size)
-                    loss = mb_agent.update(i, batch["observations"], batch["actions"], batch["next_observations"], dt)
-                else:
-                    raise Exception
-                step_losses.append(loss)
-            all_losses.append(np.mean(step_losses))
-
-        # on iteration 0, plot the full learning curve
-        if itr == 0:
-            plt.plot(all_losses)
-            plt.title("Iteration 0: Dynamics Model Training Loss")
-            plt.ylabel("Loss")
-            plt.xlabel("Step")
-            plt.savefig(os.path.join(logger._log_dir, "itr_0_loss_curve.png"))
-
-        # log the average loss
-        loss = np.mean(all_losses)
-        logger.log_scalar(loss, "dynamics_loss", itr)
-
         # Run evaluation
         if config["num_eval_trajectories"] == 0:
             continue
