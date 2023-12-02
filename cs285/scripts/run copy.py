@@ -6,6 +6,7 @@ import yaml
 from cs285 import envs
 
 from cs285.agents.ode_agent import ODEAgent
+from cs285.agents.ode_agent_cheat import ODEAgent_cheat
 from cs285.agents.model_based_agent import ModelBasedAgent
 from cs285.infrastructure.replay_buffer import ReplayBuffer
 import cs285.env_configs
@@ -59,7 +60,13 @@ def run_training_loop(
     else:
         fps = 2
 
-    mb_agent=utils.RandomPolicy(env=env)
+    # initialize agent
+    AgentClass = {"mpc": ModelBasedAgent,
+                  "ode": ODEAgent_cheat}[agent_name]
+    mb_agent = AgentClass(
+        env,
+        **config["agent_kwargs"],
+    )
     actor_agent = mb_agent
 
     replay_buffer = ReplayBuffer(config["replay_buffer_capacity"])
@@ -97,9 +104,13 @@ def run_training_loop(
                 dones=traj["done"],
             )
 
+        # update agent's statistics with the entire replay buffer
+        mb_agent.update_statistics(
+            obs=replay_buffer.observations[: len(replay_buffer)],
+            acs=replay_buffer.actions[: len(replay_buffer)],
+            next_obs=replay_buffer.next_observations[: len(replay_buffer)],
+        )
 
-        # train agent
-        print("Training agent...")
         # Run evaluation
         if config["num_eval_trajectories"] == 0:
             continue
