@@ -14,7 +14,8 @@ def ode_config(
     dt_sampler_kwargs: dict={"dt": 0.05},
     learning_rate: float = 1e-3,
     ensemble_size: int = 3,
-    mpc_horizon: int = 10,
+    mpc_horizon_steps: int = 100,
+    mpc_timestep: float=0.005,
     mpc_strategy: str = "random",
     mpc_num_action_sequences: int = 1000,
     cem_num_iters: Optional[int] = None,
@@ -28,7 +29,6 @@ def ode_config(
     num_agent_train_steps_per_iter: int = 20,
     num_eval_trajectories: int = 10,
     hidden_dims: Sequence[int] = [128, 128, 128],
-    timestep: float = 0.005,
     activation: str = "relu",
     output_activation: str = "identity"
 ):
@@ -49,7 +49,7 @@ def ode_config(
                      render_mode="single_rgb_array" if render else None),
         )
 
-    log_string = f"{env_name}_{exp_name}_hiddendims{hidden_dims}_mpc{mpc_strategy}_horizon{mpc_horizon}_actionseq{mpc_num_action_sequences}"
+    log_string = f"{env_name}_{exp_name}_hiddendims{hidden_dims}_mpc{mpc_strategy}_horizon{mpc_horizon_steps}_actionseq{mpc_num_action_sequences}"
     if mpc_strategy == "cem":
         log_string += f"_cem_iters{cem_num_iters}"
 
@@ -57,14 +57,14 @@ def ode_config(
         "agent_kwargs": {
             "make_optimizer": make_optimizer,
             "ensemble_size": ensemble_size,
-            "mpc_horizon": mpc_horizon,
+            "mpc_horizon_steps": mpc_horizon_steps,
+            "mpc_timestep": mpc_timestep,
             "mpc_strategy": mpc_strategy,
             "mpc_num_action_sequences": mpc_num_action_sequences,
             "cem_num_iters": cem_num_iters,
             "cem_num_elites": cem_num_elites,
             "cem_alpha": cem_alpha,
             "hidden_dims": hidden_dims,
-            "timestep": timestep,
             "activation": activation,
             "output_activation": output_activation
         },

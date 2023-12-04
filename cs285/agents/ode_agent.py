@@ -178,7 +178,7 @@ class ODEAgent(nn.Module):
             rewards = self.evaluate_action_sequences(obs, actions)
             assert rewards.shape == (self.mpc_num_action_sequences,)
             best_index = np.argmax(rewards)
-            return actions[best_index]
+            return actions[best_index, 0, :]
         elif self.mpc_strategy == "cem":
             raise NotImplementedError
         else:

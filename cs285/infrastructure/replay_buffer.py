@@ -146,12 +146,12 @@ class ReplayBufferTrajectories():
         self.acs = None
         self.rews = None
         self.next_obs = None
-        self.terminals = None
+        self.dones = None
         self.dts = None
 
     def __len__(self):
         if self.obs is not None:
-            return self.obs.shape[0]
+            return len(self.obs)
         else:
             return 0
 
@@ -167,7 +167,7 @@ class ReplayBufferTrajectories():
         actions = [path["action"] for path in paths]
         rewards = [path["reward"] for path in paths]
         next_observations = [path["next_observation"] for path in paths] 
-        terminals = [path["terminal"] for path in paths]
+        dones = [path["done"] for path in paths]
         dts = [path["dt"] for path in paths]
 
         if self.obs is None:
@@ -175,24 +175,24 @@ class ReplayBufferTrajectories():
             self.acs = actions
             self.rews = rewards
             self.next_obs = next_observations
-            self.terminals = terminals
+            self.dones = dones
             self.dts = dts
         else:
             self.obs = self.obs.extend(observations)
             self.acs = self.acs.extend(actions)
             self.rews = self.rews.extend(rewards)
             self.next_obs = self.next_obs.extend(next_observations)
-            self.terminals = self.terminals.extend(terminals)
+            self.dones = self.dones.extend(dones)
             self.dts = self.dts.extend(dts)
 
     def sample_rollout(self):
         # returns a single rollout
         idx = self.rng.integers(low=0, high=len(self))
         return {
-            "observations": self.observations[idx],
-            "actions": self.actions[idx],
-            "rewards": self.rewards[idx],
-            "next_observations": self.next_observations[idx],
+            "observations": self.obs[idx],
+            "actions": self.acs[idx],
+            "rewards": self.rews[idx],
+            "next_observations": self.next_obs[idx],
             "dones": self.dones[idx],
             "dts": self.dts[idx]
         }
