@@ -4,13 +4,14 @@ from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 import gym
 import torch
 from typing import Optional
+from cs285.envs.dt_sampler import BaseSampler, UniformSampler, ConstantSampler, ExponentialSampler
 
 
 def mpc_config(
     env_name: str,
     exp_name: str,
-    dt_lambda: float=1/0.05,
-    fixed_steps: int=None, 
+    dt_sampler_name: str = "constant",
+    dt_sampler_kwargs: dict={"dt": 0.05},
     hidden_size: int = 128,
     num_layers: int = 3,
     learning_rate: float = 1e-3,
@@ -30,12 +31,6 @@ def mpc_config(
     num_eval_trajectories: int = 10,
 ):
     # hardcoded for this assignment
-    if env_name == "reacher-cs285-v0":
-        ep_len = 200
-    if env_name == "cheetah-cs285-v0":
-        ep_len = 500
-    if env_name == "obstacles-cs285-v0":
-        ep_len = 100
     if env_name == "pendulum-cs285-v0":
         ep_len = 200
 
@@ -49,12 +44,14 @@ def mpc_config(
 
     def make_optimizer(params: nn.ParameterList):
         return torch.optim.Adam(params, lr=learning_rate)
-
+    
+    dt_sampler = {"constant": ConstantSampler,
+                  "uniform": UniformSampler,
+                  "exponential": ExponentialSampler}[dt_sampler_name](**dt_sampler_kwargs)
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
             gym.make(env_name, 
-                     dt_lambda=dt_lambda,
-                     fixed_steps=fixed_steps,
+                     dt_sampler=dt_sampler,
                      render_mode="single_rgb_array" if render else None),
         )
 

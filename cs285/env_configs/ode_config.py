@@ -4,13 +4,14 @@ from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 import gym
 import torch
 from typing import Optional, Sequence
+from cs285.envs.dt_sampler import BaseSampler, ConstantSampler, UniformSampler, ExponentialSampler
 
 
 def ode_config(
     env_name: str,
     exp_name: str,
-    dt_lambda: float=1/0.05,
-    fixed_steps: int=None, 
+    dt_sampler_name: str = "constant",
+    dt_sampler_kwargs: dict={"dt": 0.05},
     learning_rate: float = 1e-3,
     ensemble_size: int = 3,
     mpc_horizon: int = 10,
@@ -38,11 +39,13 @@ def ode_config(
     def make_optimizer(params: nn.ParameterList):
         return torch.optim.Adam(params, lr=learning_rate)
 
+    dt_sampler = {"constant": ConstantSampler,
+                  "uniform": UniformSampler,
+                  "exponential": ExponentialSampler}[dt_sampler_name](**dt_sampler_kwargs)
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
-            gym.make(env_name,
-                     dt_lambda=dt_lambda,
-                     fixed_steps=fixed_steps,
+            gym.make(env_name, 
+                     dt_sampler=dt_sampler,
                      render_mode="single_rgb_array" if render else None),
         )
 

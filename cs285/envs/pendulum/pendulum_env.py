@@ -11,7 +11,7 @@ from gym import spaces
 from gym.envs.classic_control import utils
 from gym.error import DependencyNotInstalled
 
-from dt_sampler import BaseSampler
+from cs285.envs.dt_sampler import BaseSampler
 
 DEFAULT_X = np.pi
 DEFAULT_Y = 1.0
