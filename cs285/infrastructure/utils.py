@@ -26,7 +26,7 @@ def sample_trajectory(
 ) -> Dict[str, np.ndarray]:
     """Sample a rollout in the environment from a policy."""
     ob = env.reset()
-    obs, acs, rewards, next_obs, dones, image_obs = [], [], [], [], [], []
+    obs, acs, rewards, next_obs, dones, image_obs, dts = [], [], [], [], [], [], []
     steps = 0
 
     while True:
@@ -47,6 +47,7 @@ def sample_trajectory(
         ac = policy.get_action(ob)
 
         next_ob, rew, done, info = env.step(ac)
+        dt = info["dt"]
 
         steps += 1
         # only record a "done" into the replay buffer if not truncated
@@ -60,6 +61,7 @@ def sample_trajectory(
         rewards.append(rew)
         next_obs.append(next_ob)
         dones.append(done_not_truncated)
+        dts.append(dt)
 
         ob = next_ob  # jump to next timestep
 
@@ -81,6 +83,7 @@ def sample_trajectory(
         "next_observation": np.array(next_obs, dtype=np.float32),
         "done": np.array(dones, dtype=np.float32),
         "episode_statistics": episode_statistics,
+        "dt": np.array(dts, dtype=np.float32)
     }
 
 
@@ -144,25 +147,23 @@ def compute_metrics(trajs, eval_trajs):
     return logs
 
 
-def convert_listofrollouts(trajs):
+def convert_listofrollouts(paths, concat_rew=True):
     """
-    Take a list of rollout dictionaries and return separate arrays, where each array is a concatenation of that array
-    from across the rollouts.
+        Take a list of rollout dictionaries
+        and return separate arrays,
+        where each array is a concatenation of that array from across the rollouts
     """
-    observations = np.concatenate([traj["observation"] for traj in trajs])
-    actions = np.concatenate([traj["action"] for traj in trajs])
-    next_observations = np.concatenate([traj["next_observation"] for traj in trajs])
-    terminals = np.concatenate([traj["terminal"] for traj in trajs])
-    concatenated_rewards = np.concatenate([traj["reward"] for traj in trajs])
-    unconcatenated_rewards = [traj["reward"] for traj in trajs]
-    return (
-        observations,
-        actions,
-        next_observations,
-        terminals,
-        concatenated_rewards,
-        unconcatenated_rewards,
-    )
+    observations = np.concatenate([path["observation"] for path in paths])
+    actions = np.concatenate([path["action"] for path in paths])
+    if concat_rew:
+        rewards = np.concatenate([path["reward"] for path in paths])
+    else:
+        rewards = [path["reward"] for path in paths]
+    next_observations = np.concatenate([path["next_observation"] for path in paths])
+    terminals = np.concatenate([path["terminal"] for path in paths])
+    dts = np.concatenate([path["dt"] for path in paths])
+    return observations, actions, rewards, next_observations, terminals,
+
 
 
 def get_traj_length(traj):

@@ -11,6 +11,8 @@ from gym import spaces
 from gym.envs.classic_control import utils
 from gym.error import DependencyNotInstalled
 
+from dt_sampler import BaseSampler
+
 DEFAULT_X = np.pi
 DEFAULT_Y = 1.0
 
@@ -95,14 +97,11 @@ class PendulumEnv(gym.Env):
 
     def __init__(
             self, 
-            fixed_steps=None,
-            dt_lambda=1/0.05, 
+            dt_sampler: BaseSampler,
             render_mode: Optional[str] = None, 
             g=10.0
         ):
-        self.dt_lambda = dt_lambda
-        self.dt_expon = expon(scale=1/self.dt_lambda)
-        self.fixed_steps = fixed_steps
+        self.dt_sampler = dt_sampler
 
         self.max_speed = 8
         self.max_torque = 2.0
@@ -142,16 +141,17 @@ class PendulumEnv(gym.Env):
 
         self.state = np.array([newth, newthdot])
 
+        costs = angle_normalize(newth) ** 2 + 0.1 * newthdot ** 2 + 0.001 * (u ** 2)
+        return costs
+
     def step(self, u):
-        dt = self.dt_expon.rvs() if self.fixed_steps is None else self.fixed_steps * self.timestep
+        dt = self.dt_sampler.get_dt()
         n = int(dt / self.timestep)
+        costs = 0
         for _ in range(n):
-            self._single_step(u, self.timestep)
-        self._single_step(u, dt - self.timestep * n)
-        
-        th, thdot = self.state  # th := theta
+            costs += self._single_step(u, self.timestep) * self.timestep
+        costs += self._single_step(u, dt - self.timestep * n) * (dt - self.timestep * n)
         self.last_u = u  # for rendering
-        costs = angle_normalize(th) ** 2 + 0.1 * thdot**2 + 0.001 * (u**2)
 
         if self.render_mode == "human":
             self.render()
