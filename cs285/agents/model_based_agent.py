@@ -69,7 +69,7 @@ class ModelBasedAgent(nn.Module):
             "obs_delta_std", torch.ones(self.ob_dim, device=ptu.device)
         )
 
-    def update(self, i: int, obs: np.ndarray, acs: np.ndarray, next_obs: np.ndarray):
+    def update(self, i: int, obs: np.ndarray, acs: np.ndarray, next_obs: np.ndarray, dts :np.ndarray):
         """
         Update self.dynamics_models[i] using the given batch of data.
 

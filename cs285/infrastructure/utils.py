@@ -112,11 +112,15 @@ def sample_n_trajectories(
 ):
     """Collect ntraj rollouts."""
     trajs = []
+    timesteps_this_bath = 0
     for i in trange(ntraj):
         # collect rollout
         traj = sample_trajectory(env, policy, max_length, render)
         trajs.append(traj)
-    return trajs
+
+        # count steps
+        timesteps_this_bath += get_traj_length(traj)
+    return trajs, timesteps_this_bath
 
 
 def compute_metrics(trajs, eval_trajs):
