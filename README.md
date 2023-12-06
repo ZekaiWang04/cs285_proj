@@ -3,15 +3,12 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-0. ##Now Debugging## Baseline performs poorly on env
-1. ##Now Testing## Incorporate discount in ODE training
-2. ##Now Testing## Batchify ODE training
-3. ##TODO NEXT## CEM
-4. Debug why jax runs training faster on mac CPU than GPU
-5. Add fully-jaxified implementation of everything, including from environment (should be easy: jax.jit and replacing np with jnp)
-6. Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
-7. Change ODE structure, for example try latent ode, possibly incorporating action
-8. Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
+1. ##Implementing## CEM
+2. ##Next TODO## Debug why jax runs training faster on mac CPU than GPU
+3. Add fully-jaxified implementation of everything, including from environment (should be easy: jax.jit and replacing np with jnp)
+4. Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
+5. Change ODE structure, for example try latent ode, possibly incorporating action
+6. Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
 
 ### Experiments
 
@@ -47,6 +44,13 @@ This is a tracking document for our final project
 
 Jax implementation done! New bottleneck is again at training
 
+Checked baseline performance on simplest task (run ```python cs285/scripts/run.py -cfg experiments/pendulum_multi_iter.yaml``` at commit 832a59e5a184ecb48c566d6e8584a99e454d7e4f)
+
+Incorporated discount in ODE training
+see ```notebooks/test_ode_agent_jax.ipynb```
+
+Batchify ODE training (i.e. batched SGD)
+see ```notebooks/test_ode_agent_jax.ipynbw```
 
 ## Possible References
 

@@ -115,7 +115,6 @@ class ODEAgent_jax():
     
     # I believe only jitting the top level function should work...
     # need testing/reading to support this "conjecture"
-    @eqx.filter_jit
     def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
         """
         Update self.dynamics_models[i] using the given trajectory
@@ -136,8 +135,9 @@ class ODEAgent_jax():
         assert acs.shape == (ep_len, self.ac_dim)
         assert times.shape == (ep_len,)
 
-        discount_array = discount ** jnp.arange(ep_len)
+        discount_array = discount ** jnp.arange(ep_len)[..., jnp.newaxis]
 
+        @eqx.filter_jit
         @eqx.filter_value_and_grad
         def loss_grad(ode_func):
             sol = diffeqsolve(
@@ -153,7 +153,7 @@ class ODEAgent_jax():
             assert sol.ys.shape == obs.shape == (ep_len, self.ob_dim)
             return jnp.mean(discount_array * (sol.ys - obs) ** 2) # do we want a  "discount"-like trick
 
-        # @eqx.filter_jit
+        @eqx.filter_jit
         def make_step(ode_func, optim, opt_state):
             loss, grad = loss_grad(ode_func)
             updates, opt_state = optim.update(grad, opt_state, ode_func)
@@ -164,40 +164,7 @@ class ODEAgent_jax():
         loss, ode_func, opt_state = make_step(ode_func, optim, opt_state)
         self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
         return loss.item()
-    
-    @DeprecationWarning
-    @eqx.filter_jit
-    def batched_update_sgd(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
-        """
-        Update self.dynamic_models[i] using the batchified trajectories
-        
-        Args:
-            i: index of the dynamic model to update
-            obs: (batch_size, ep_len, ob_dim),
-            acs: (batch_size, ep_len, ac_dim),
-            times: (batch_size, ep_len)
-            
-        Note that here we assume the ep_len is the same. Without this 
-        assumption we cannot use jnp.ndarray for inhomogenuous shape.
-        This assumption holds true for the pendulum environment, which
-        has a constant ep_len of 200. But it is false for any other 
-        environments such as cartpole. 
-        """
-        batch_size, ep_len = times.shape[0], times.shape[1]
-        assert times.shape == (batch_size, ep_len)
-        assert obs.shape == (batch_size, ep_len, self.ob_dim)
-        assert acs.shape == (batch_size, ep_len, self.ac_dim)
 
-        def update_single_batch(ob, ac, time):
-            return self.update(i=i, obs=ob, acs=ac, times=time, discount=discount)
-        losses = jax.vmap(update_single_batch)(obs, acs, times)
-        return jnp.mean(losses) # average loss
-        # TODO: check implementation, am I doing a lot of steps of gradient descents
-        # or am I doning one step of gradient descent with a large step?
-        # I believe I am doint a lot of steps of gradient descents, but I'm not sure
-
-
-    @eqx.filter_jit
     def batched_update_gd(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
         assert 0 < discount <= 1
         batch_size, ep_len = times.shape[0], times.shape[1]
@@ -205,12 +172,12 @@ class ODEAgent_jax():
         assert obs.shape == (batch_size, ep_len, self.ob_dim)
         assert acs.shape == (batch_size, ep_len, self.ac_dim)
 
-        discount_array = discount ** jnp.arange(ep_len)
+        discount_array = discount ** jnp.arange(ep_len)[..., jnp.newaxis]
         ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
-    
+
+        @eqx.filter_jit
         @eqx.filter_value_and_grad
         def get_batchified_loss(ode_func, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
-            @eqx.filter_jit
             def get_single_loss(ob: jnp.ndarray, ac: jnp.ndarray, time: jnp.ndarray):
                 assert ob.shape == (ep_len, self.ob_dim)
                 assert ac.shape == (ep_len, self.ac_dim)
@@ -222,8 +189,8 @@ class ODEAgent_jax():
                     t1=time[-1],
                     dt0=self.train_timestep,
                     y0=ob[0],
-                    args={"times": times, "actions": ac},
-                    saveat=diffrax.SaveAt(ts=times)
+                    args={"times": time, "actions": ac},
+                    saveat=diffrax.SaveAt(ts=time)
                 )
                 assert sol.ys.shape == ob.shape == (ep_len, self.ob_dim)
                 return jnp.mean(discount_array * (sol.ys - ob) ** 2)

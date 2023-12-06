@@ -189,6 +189,20 @@ class ReplayBufferTrajectories():
             self.dones = self.dones.extend(dones)
             self.dts = self.dts.extend(dts)
 
+    def sample_rollout(self):
+        # samples and returns a single rollout
+        idx = self.rng.integers(low=0, high=len(self))
+        return {
+            "observations": self.obs[idx],
+            "actions": self.acs[idx],
+            "rewards": self.rews[idx],
+            "next_observations": self.next_obs[idx],
+            "dones": self.dones[idx],
+            "dts": self.dts[idx]
+        }
+
+
+"""
     def sample_rollout(self, batch_size=1):
         # returns batch_size rollouts
         # Note: there is no "no-batch" option
@@ -205,3 +219,4 @@ class ReplayBufferTrajectories():
         } # TODO: batchify!! or equivalently I don't batchify
     # and do weird tricks in the training script
     # need time to think about speed w/ jax
+"""
