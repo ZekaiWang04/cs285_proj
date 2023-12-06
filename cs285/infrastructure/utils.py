@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import numpy as np
 import copy
+import jax
 from cs285.networks.mlp_policy import MLPPolicy
 import gym
 import cv2
@@ -22,7 +23,7 @@ class RandomPolicy:
 
 
 def sample_trajectory(
-    env: gym.Env, policy: MLPPolicy, max_length: int, render: bool = False
+    env: gym.Env, policy: MLPPolicy, max_length: int, key: jax.random.PRNGKey, render: bool = False,
 ) -> Dict[str, np.ndarray]:
     """Sample a rollout in the environment from a policy."""
     ob = env.reset()
@@ -44,7 +45,8 @@ def sample_trajectory(
                 cv2.resize(img, dsize=(250, 250), interpolation=cv2.INTER_CUBIC)
             )
 
-        ac = policy.get_action(ob)
+        ac_key, key = jax.random.split(key)
+        ac = policy.get_action(ob, key=ac_key)
 
         next_ob, rew, done, info = env.step(ac)
         dt = info["dt"]
@@ -92,6 +94,7 @@ def sample_trajectories(
     policy: MLPPolicy,
     min_timesteps_per_batch: int,
     max_length: int,
+    key: jax.random.PRNGKey,
     render: bool = False,
 ) -> Tuple[List[Dict[str, np.ndarray]], int]:
     """Collect rollouts using policy until we have collected min_timesteps_per_batch steps."""
@@ -99,7 +102,8 @@ def sample_trajectories(
     trajs = []
     while timesteps_this_batch < min_timesteps_per_batch:
         # collect rollout
-        traj = sample_trajectory(env, policy, max_length, render)
+        sample_key, key = jax.random.split(key)
+        traj = sample_trajectory(env, policy, max_length, sample_key, render)
         trajs.append(traj)
 
         # count steps
@@ -108,14 +112,15 @@ def sample_trajectories(
 
 
 def sample_n_trajectories(
-    env: gym.Env, policy: MLPPolicy, ntraj: int, max_length: int, render: bool = False
+    env: gym.Env, policy: MLPPolicy, ntraj: int, max_length: int, key: jax.random.PRNGKey, render: bool = False
 ):
     """Collect ntraj rollouts."""
     trajs = []
     timesteps_this_bath = 0
     for i in trange(ntraj):
         # collect rollout
-        traj = sample_trajectory(env, policy, max_length, render)
+        sample_key, key = jax.random.split(key)
+        traj = sample_trajectory(env, policy, max_length, sample_key, render)
         trajs.append(traj)
 
         # count steps

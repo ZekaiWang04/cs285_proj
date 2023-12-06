@@ -182,12 +182,12 @@ class ReplayBufferTrajectories():
             self.dones = dones
             self.dts = dts
         else:
-            self.obs = self.obs.extend(observations)
-            self.acs = self.acs.extend(actions)
-            self.rews = self.rews.extend(rewards)
-            self.next_obs = self.next_obs.extend(next_observations)
-            self.dones = self.dones.extend(dones)
-            self.dts = self.dts.extend(dts)
+            self.obs.extend(observations)
+            self.acs.extend(actions)
+            self.rews.extend(rewards)
+            self.next_obs.extend(next_observations)
+            self.dones.extend(dones)
+            self.dts.extend(dts)
 
     def sample_rollout(self):
         # samples and returns a single rollout

@@ -23,7 +23,8 @@ train_timestep: 0.005
 train_discount: 1.0
 
 initial_trajs: 100
+trajs: 100
 train_batch_size: 64
 num_iters: 20
-num_agent_train_steps_per_iter: 2
+num_agent_train_steps_per_iter: 100
 num_eval_trajectories: 10

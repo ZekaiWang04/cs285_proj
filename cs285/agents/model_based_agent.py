@@ -213,7 +213,7 @@ class ModelBasedAgent(nn.Module):
         # now we average over the ensemble dimension
         return sum_of_rewards.mean(axis=0)
 
-    def get_action(self, obs: np.ndarray):
+    def get_action(self, obs: np.ndarray, key=None):
         """
         Choose the best action using model-predictive control.
 

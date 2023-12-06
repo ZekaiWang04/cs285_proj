@@ -10,6 +10,7 @@ import os
 import time
 
 import gym
+import jax
 import jax.numpy as jnp
 import numpy as np
 import torch
@@ -29,6 +30,7 @@ def run_training_loop_ode(
     # set random seeds
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    key = jax.random.PRNGKey(args.seed)
     ptu.init_gpu(use_gpu=not args.no_gpu, gpu_id=args.which_gpu)
 
     # make the gym environment
@@ -62,12 +64,14 @@ def run_training_loop_ode(
         print(f"\n\n********** Iteration {itr} ************")
         # collect data
         print("Collecting data...")
+        data_key, key = jax.random.split(key)
         if itr == 0:
             ntraj = config["initial_trajs"]
             trajs, envsteps_this_batch = utils.sample_n_trajectories(
                 env=env,
                 policy=utils.RandomPolicy(env=env),
                 ntraj=ntraj,
+                key=data_key,
                 max_length=ep_len,
             )
         else:
@@ -76,6 +80,7 @@ def run_training_loop_ode(
                 env=env, 
                 policy=actor_agent, 
                 ntraj=ntraj,
+                key=data_key,
                 max_length=ep_len
             )
 
@@ -103,6 +108,7 @@ def run_training_loop_ode(
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
 
+        """
         # on iteration 0, plot the full learning curve
         if itr == 0:
             plt.plot(all_losses)
@@ -110,6 +116,7 @@ def run_training_loop_ode(
             plt.ylabel("Loss")
             plt.xlabel("Step")
             plt.savefig(os.path.join(logger._log_dir, "itr_0_loss_curve.png"))
+        """
 
         # log the average loss
         loss = np.mean(all_losses)
@@ -119,10 +126,12 @@ def run_training_loop_ode(
         if config["num_eval_trajectories"] == 0:
             continue
         print(f"Evaluating {config['num_eval_trajectories']} rollouts...")
+        sample_key, key = jax.random.split(key)
         trajs, _ = utils.sample_n_trajectories(
             eval_env,
             policy=actor_agent,
             ntraj=config["num_eval_trajectories"],
+            key=sample_key,
             max_length=ep_len,
         )
         returns = [t["episode_statistics"]["r"] for t in trajs]
