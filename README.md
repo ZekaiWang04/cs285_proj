@@ -3,14 +3,13 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-Add fully-jaxified implementation of everything, including from environment (should be easy: jax.jit and replacing np with jnp)
+##Next TODO## Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
 
-Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
-
-Change ODE structure, for example try latent ode, possibly incorporating action
+##Next TODO##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder)
 
 Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
 
+(Right now I don't think we need to change everything to Jax. We can use vanilla numpy for the time being and then profile our code. If it takes a nonnegligible amount of time to transfer data from GPU to CPU, we might rewrite things in Jax.)
 ### Experiments
 
 1. Dyamic learning with ODE 
