@@ -2,14 +2,9 @@ import os
 import time
 from typing import Optional
 from matplotlib import pyplot as plt
-import yaml
-from cs285 import envs
 
 from cs285.agents.ode_agent import ODEAgent
-from cs285.agents.ode_agent_cheat import ODEAgent_cheat
-from cs285.agents.model_based_agent import ModelBasedAgent
-from cs285.infrastructure.replay_buffer import ReplayBuffer
-import cs285.env_configs
+from cs285.infrastructure.replay_buffer import ReplayBufferTrajectories
 
 import os
 import time
@@ -23,18 +18,13 @@ import tqdm
 from cs285.infrastructure import utils
 from cs285.infrastructure.logger import Logger
 
-from scripting_utils import make_logger, make_config
-
 import argparse
 
-from cs285.envs import register_envs
 
-register_envs()
-
-
-def run_training_loop(
+def run_training_loop_ode(
     config: dict, agent_name: str, logger: Logger, args: argparse.Namespace
 ):
+    assert agent_name == "ode"
     # set random seeds
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -61,15 +51,9 @@ def run_training_loop(
         fps = 2
 
     # initialize agent
-    AgentClass = {"mpc": ModelBasedAgent,
-                  "ode": ODEAgent_cheat}[agent_name]
-    mb_agent = AgentClass(
-        env,
-        **config["agent_kwargs"],
-    )
+    mb_agent = ODEAgent(env, **config["agent_kwargs"])
+    replay_buffer = ReplayBufferTrajectories(seed=args.seed)
     actor_agent = mb_agent
-
-    replay_buffer = ReplayBuffer(config["replay_buffer_capacity"])
 
     total_envsteps = 0
 
@@ -80,36 +64,52 @@ def run_training_loop(
         if itr == 0:
             # TODO(student): collect at least config["initial_batch_size"] transitions with a random policy
             # HINT: Use `utils.RandomPolicy` and `utils.sample_trajectories`
-            trajs, envsteps_this_batch = utils.sample_trajectories(env=env, 
-                                                                   policy=utils.RandomPolicy(env), 
-                                                                   min_timesteps_per_batch=config["initial_batch_size"],
-                                                                   max_length=ep_len)
+            ntraj = config["initial_batch_size"] // ep_len
+            trajs, envsteps_this_batch = utils.sample_n_trajectories(
+                env=env,
+                policy=utils.RandomPolicy(env=env),
+                ntraj=ntraj,
+                max_length=ep_len,
+            )
         else:
             # TODO(student): collect at least config["batch_size"] transitions with our `actor_agent`
-            trajs, envsteps_this_batch = utils.sample_trajectories(env=env, 
-                                                                   policy=actor_agent, 
-                                                                   min_timesteps_per_batch=config["batch_size"],
-                                                                   max_length=ep_len)
+            trajs, envsteps_this_batch = utils.sample_n_trajectories(
+                env=env, 
+                policy=actor_agent, 
+                ntraj=ntraj,
+                max_length=ep_len
+            )
 
         total_envsteps += envsteps_this_batch
         logger.log_scalar(total_envsteps, "total_envsteps", itr)
 
         # insert newly collected data into replay buffer
-        for traj in trajs:
-            replay_buffer.batched_insert(
-                observations=traj["observation"],
-                actions=traj["action"],
-                rewards=traj["reward"],
-                next_observations=traj["next_observation"],
-                dones=traj["done"],
-            )
+        replay_buffer.add_rollouts(paths=trajs)
 
-        # update agent's statistics with the entire replay buffer
-        mb_agent.update_statistics(
-            obs=replay_buffer.observations[: len(replay_buffer)],
-            acs=replay_buffer.actions[: len(replay_buffer)],
-            next_obs=replay_buffer.next_observations[: len(replay_buffer)],
-        )
+        # train agent
+        print("Training agent...")
+        all_losses = []
+        for _ in tqdm.trange(
+            config["num_agent_train_steps_per_iter"], dynamic_ncols=True
+        ):
+            step_losses = []
+            for i in range(mb_agent.ensemble_size):
+                traj = replay_buffer.sample_rollout()
+                loss = mb_agent.update(i, traj["observations"], traj["actions"], np.cumsum(traj["dts"]))
+                step_losses.append(loss)
+            all_losses.append(np.mean(step_losses))
+
+        # on iteration 0, plot the full learning curve
+        if itr == 0:
+            plt.plot(all_losses)
+            plt.title("Iteration 0: Dynamics Model Training Loss")
+            plt.ylabel("Loss")
+            plt.xlabel("Step")
+            plt.savefig(os.path.join(logger._log_dir, "itr_0_loss_curve.png"))
+
+        # log the average loss
+        loss = np.mean(all_losses)
+        logger.log_scalar(loss, "dynamics_loss", itr)
 
         # Run evaluation
         if config["num_eval_trajectories"] == 0:
@@ -152,27 +152,3 @@ def run_training_loop(
                     max_videos_to_save=args.num_render_trajectories,
                     video_title="eval_rollouts",
                 )
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config_file", "-cfg", type=str, required=True)
-
-    parser.add_argument("--eval_interval", "-ei", type=int, default=5000)
-    parser.add_argument("--num_render_trajectories", "-nvid", type=int, default=0)
-
-    parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--no_gpu", "-ngpu", action="store_true")
-    parser.add_argument("--which_gpu", "-g", default=0)
-
-    args = parser.parse_args()
-
-    config, agent_name = make_config(args.config_file)
-    logger = make_logger(config)
-
-
-    run_training_loop(config, agent_name, logger, args)
-
-
-if __name__ == "__main__":
-    main()
