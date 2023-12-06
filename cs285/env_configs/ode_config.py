@@ -6,7 +6,7 @@ from typing import Optional, Sequence
 from cs285.envs.dt_sampler import BaseSampler, ConstantSampler, UniformSampler, ExponentialSampler
 
 
-def odejax_config(
+def ode_config(
     env_name: str,
     exp_name: str,
     key: jax.random.PRNGKey = jax.random.PRNGKey(0),
@@ -33,7 +33,8 @@ def odejax_config(
     num_layers: int = 4,
     activation: str = "relu",
     output_activation: str = "identity",
-    train_timestep: float = 0.005
+    train_timestep: float = 0.005,
+    train_discount: float = 1.0
 ):
     # hardcoded for this assignment
     if env_name == "pendulum-cs285-v0":
@@ -60,6 +61,7 @@ def odejax_config(
             "num_layers": num_layers,
             "ensemble_size": ensemble_size,
             "train_timestep": train_timestep,
+            "train_discount": train_discount,
             "mpc_horizon_steps": mpc_horizon_steps,
             "mpc_discount": mpc_discount,
             "mpc_timestep": mpc_timestep,

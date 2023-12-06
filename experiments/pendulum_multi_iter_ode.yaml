@@ -6,9 +6,9 @@ base_config: ode
 dt_sampler_name: constant
 dt_sampler_kwargs:
   dt: 0.05
-learing_rate: 0.001
+learning_rate: 0.001
 ensemble_size: 10
-mpc_horizon_step: 500
+mpc_horizon_steps: 500
 mpc_discount: 1.0
 mpc_timestep: 0.005
 mpc_strategy: cem
@@ -20,9 +20,10 @@ cem_alpha: 1
 hidden_size: 128
 num_layers: 4
 train_timestep: 0.005
+train_discount: 1.0
 
 initial_trajs: 100
 train_batch_size: 64
 num_iters: 20
-num_agent_train_steps_per_iter: 100
+num_agent_train_steps_per_iter: 2
 num_eval_trajectories: 10

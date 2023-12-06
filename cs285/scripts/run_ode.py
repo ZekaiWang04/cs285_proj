@@ -94,7 +94,12 @@ def run_training_loop_ode(
             step_losses = []
             for i in range(mb_agent.ensemble_size):
                 traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"])
-                loss = mb_agent.update(i, jnp.array(traj["observations"]), jnp.array(traj["actions"]), jnp.cumsum(jnp.array(traj["dts"]), axis=-1))
+                loss = mb_agent.batched_update(
+                    i=i, 
+                    obs=jnp.array(traj["observations"]), 
+                    acs=jnp.array(traj["actions"]), 
+                    times=jnp.cumsum(jnp.array(traj["dts"]), axis=-1)
+                )
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
 

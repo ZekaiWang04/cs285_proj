@@ -63,6 +63,7 @@ class ODEAgent():
         num_layers: int,
         ensemble_size: int,
         train_timestep: float,
+        train_discount: float,
         mpc_horizon_steps: int,
         mpc_discount: float,
         mpc_timestep: float,
@@ -78,6 +79,8 @@ class ODEAgent():
         # super().__init__()
         self.env = env
         self.train_timestep = train_timestep
+        assert 0 < train_discount <= 1
+        self.train_discount = train_discount
         self.mpc_horizon_steps = mpc_horizon_steps # in terms of timesteps
         assert 0 < mpc_discount <= 1
         self.mpc_discount = mpc_discount
@@ -119,7 +122,7 @@ class ODEAgent():
     # I believe only jitting the top level function should work...
     # need testing/reading to support this "conjecture"
     @DeprecationWarning
-    def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
+    def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
         """
         Update self.dynamics_models[i] using the given trajectory
 
@@ -137,13 +140,12 @@ class ODEAgent():
         # TODO: for some reason, this function is an order of magnitude
         # slower than the batched_update function below. For now I have
         # deperacated this function in favor of the one below.
-        assert 0 < discount <= 1
         ep_len = obs.shape[0]
         assert obs.shape == (ep_len, self.ob_dim)
         assert acs.shape == (ep_len, self.ac_dim)
         assert times.shape == (ep_len,)
 
-        discount_array = discount ** jnp.arange(ep_len)[..., jnp.newaxis]
+        discount_array = self.train_discount ** jnp.arange(ep_len)[..., jnp.newaxis]
 
         @eqx.filter_jit
         @eqx.filter_value_and_grad
@@ -173,14 +175,13 @@ class ODEAgent():
         self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
         return loss.item()
 
-    def batched_update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
-        assert 0 < discount <= 1
+    def batched_update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
         batch_size, ep_len = times.shape[0], times.shape[1]
         assert times.shape == (batch_size, ep_len)
         assert obs.shape == (batch_size, ep_len, self.ob_dim)
         assert acs.shape == (batch_size, ep_len, self.ac_dim)
 
-        discount_array = discount ** jnp.arange(ep_len)[..., jnp.newaxis]
+        discount_array = self.train_discount ** jnp.arange(ep_len)[..., jnp.newaxis]
         ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
 
         @eqx.filter_jit

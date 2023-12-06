@@ -43,6 +43,7 @@ class ODEAgent_True_Dynamics(ODEAgent):
             num_layers=1, # just for convenience
             ensemble_size=1, # just for convenience
             train_timestep=None,
+            train_discount=1, # just for convenience
             mpc_horizon_steps=mpc_horizon_steps,
             mpc_discount=mpc_discount,
             mpc_timestep=mpc_timestep,
@@ -58,10 +59,10 @@ class ODEAgent_True_Dynamics(ODEAgent):
         self.optim_states = None
         self.true_dynamics = true_dynamics
     
-    def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
+    def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
         pass
 
-    def batched_update_gd(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
+    def batched_update_gd(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
         pass
 
     @eqx.filter_jit

@@ -3,11 +3,13 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-##Next TODO## Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
-
 ##Next TODO##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder)
 
 ##Next TODO## Consider adding a maximum trajs into the reply buffer trajs
+
+##Next TODO## parallelize ensemble updates with jax vmap, if possible
+
+Examine why on the notebook training is lightning speed while on the script it takes so long
 
 Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
 
@@ -59,6 +61,8 @@ Implemented CEM
 Implemented skeleton for ode_agent_true_dynamics
 
 Give up on trying to figure out why for ode_agent.update(), cpu runs faster than gpu. Deperated it in favor of the faster ode_agent.batch_update().
+
+Change the run script / configs to have different training setups.
 
 ## Possible References
 
