@@ -115,6 +115,7 @@ class ODEAgent():
     
     # I believe only jitting the top level function should work...
     # need testing/reading to support this "conjecture"
+    @DeprecationWarning
     def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
         """
         Update self.dynamics_models[i] using the given trajectory
@@ -129,6 +130,10 @@ class ODEAgent():
         # Note: the discount will mess with the loss, so if we want to 
         # compare "training" effect with different discount, we can't 
         # really do that
+
+        # TODO: for some reason, this function is an order of magnitude
+        # slower than the batched_update function below. For now I have
+        # deperacated this function in favor of the one below.
         assert 0 < discount <= 1
         ep_len = obs.shape[0]
         assert obs.shape == (ep_len, self.ob_dim)
@@ -165,7 +170,7 @@ class ODEAgent():
         self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
         return loss.item()
 
-    def batched_update_gd(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
+    def batched_update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
         assert 0 < discount <= 1
         batch_size, ep_len = times.shape[0], times.shape[1]
         assert times.shape == (batch_size, ep_len)
