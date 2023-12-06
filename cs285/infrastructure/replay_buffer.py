@@ -135,7 +135,11 @@ class ReplayBufferTransitions:
 
 
 class ReplayBufferTrajectories():
-
+    # There might be a bottleneck! Now I am using list, not array
+    # This is because I want the flexibility to incorporate 
+    # rollouts with different lengths
+    # But I can also do something like having a cutoff_length
+    # and a auxiliary value indicating how long each rollout is
     def __init__(self, seed=0):
         self.rng = np.random.default_rng(seed)
         # store each rollout
@@ -185,9 +189,12 @@ class ReplayBufferTrajectories():
             self.dones = self.dones.extend(dones)
             self.dts = self.dts.extend(dts)
 
-    def sample_rollout(self):
-        # returns a single rollout
-        idx = self.rng.integers(low=0, high=len(self))
+    def sample_rollout(self, batch_size=1):
+        # returns batch_size rollouts
+        # Note: there is no "no-batch" option
+        # so be careful with shapes when only
+        # sampling one rollout
+        idx = self.rng.integers(low=0, high=len(self), size=(batch_size,))
         return {
             "observations": self.obs[idx],
             "actions": self.acs[idx],
@@ -195,4 +202,6 @@ class ReplayBufferTrajectories():
             "next_observations": self.next_obs[idx],
             "dones": self.dones[idx],
             "dts": self.dts[idx]
-        }
+        } # TODO: batchify!! or equivalently I don't batchify
+    # and do weird tricks in the training script
+    # need time to think about speed w/ jax

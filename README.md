@@ -3,6 +3,7 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
+0. ##Now Debugging## Baseline performs poorly on env
 1. ##Now Testing## Incorporate discount in ODE training
 2. ##Now Testing## Batchify ODE training
 3. ##TODO NEXT## CEM
@@ -47,3 +48,15 @@ This is a tracking document for our final project
 Jax implementation done! New bottleneck is again at training
 
 
+## Possible References
+
+Latent ODE
+https://arxiv.org/pdf/1907.03907.pdf
+
+ODE Original Paper
+
+ODE PhD Thesis
+
+Jax
+
+The Continuous-time Model Based

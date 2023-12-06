@@ -152,6 +152,7 @@ class PendulumEnv(gym.Env):
         for _ in range(n):
             costs += self._single_step(u, self.timestep) * self.timestep
         costs += self._single_step(u, dt - self.timestep * n) * (dt - self.timestep * n)
+        costs /= dt
         self.last_u = u  # for rendering
 
         if self.render_mode == "human":
