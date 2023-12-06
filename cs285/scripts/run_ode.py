@@ -10,6 +10,7 @@ import os
 import time
 
 import gym
+import jax.numpy as jnp
 import numpy as np
 import torch
 from cs285.infrastructure import pytorch_util as ptu
@@ -62,9 +63,7 @@ def run_training_loop_ode(
         # collect data
         print("Collecting data...")
         if itr == 0:
-            # TODO(student): collect at least config["initial_batch_size"] transitions with a random policy
-            # HINT: Use `utils.RandomPolicy` and `utils.sample_trajectories`
-            ntraj = config["initial_batch_size"] // ep_len
+            ntraj = config["initial_trajs"]
             trajs, envsteps_this_batch = utils.sample_n_trajectories(
                 env=env,
                 policy=utils.RandomPolicy(env=env),
@@ -72,7 +71,7 @@ def run_training_loop_ode(
                 max_length=ep_len,
             )
         else:
-            # TODO(student): collect at least config["batch_size"] transitions with our `actor_agent`
+            ntraj = config["trajs"]
             trajs, envsteps_this_batch = utils.sample_n_trajectories(
                 env=env, 
                 policy=actor_agent, 
@@ -94,8 +93,8 @@ def run_training_loop_ode(
         ):
             step_losses = []
             for i in range(mb_agent.ensemble_size):
-                traj = replay_buffer.sample_rollout()
-                loss = mb_agent.update(i, traj["observations"], traj["actions"], np.cumsum(traj["dts"]))
+                traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"])
+                loss = mb_agent.update(i, jnp.array(traj["observations"]), jnp.array(traj["actions"]), jnp.cumsum(jnp.array(traj["dts"]), axis=-1))
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
 
@@ -115,7 +114,7 @@ def run_training_loop_ode(
         if config["num_eval_trajectories"] == 0:
             continue
         print(f"Evaluating {config['num_eval_trajectories']} rollouts...")
-        trajs = utils.sample_n_trajectories(
+        trajs, _ = utils.sample_n_trajectories(
             eval_env,
             policy=actor_agent,
             ntraj=config["num_eval_trajectories"],

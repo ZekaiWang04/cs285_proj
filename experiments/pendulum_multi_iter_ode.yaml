@@ -2,14 +2,27 @@ env_name: pendulum-cs285-v0
 exp_name: pendulum_multi_ode
 
 base_config: ode
-hidden_dims: [128, 128, 128]
 
-num_iters: 15
-initial_batch_size: 5000
-batch_size: 5000
-mpc_num_action_sequences: 20
-num_agent_train_steps_per_iter: 1000
-num_eval_trajectories: 10
-mpc_horizon_steps: 100
+dt_sampler_name: constant
+dt_sampler_kwargs:
+  dt: 0.05
+learing_rate: 0.001
+ensemble_size: 10
+mpc_horizon_step: 500
+mpc_discount: 1.0
 mpc_timestep: 0.005
-mpc_strategy: random 
+mpc_strategy: cem
+mpc_num_action_sequences: 1000
+cem_num_iters: 5
+cem_num_elites: 10
+cem_alpha: 1
+
+hidden_size: 128
+num_layers: 4
+train_timestep: 0.005
+
+initial_trajs: 100
+train_batch_size: 64
+num_iters: 20
+num_agent_train_steps_per_iter: 100
+num_eval_trajectories: 10

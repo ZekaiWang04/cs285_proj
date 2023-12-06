@@ -200,6 +200,26 @@ class ReplayBufferTrajectories():
             "dones": self.dones[idx],
             "dts": self.dts[idx]
         }
+    
+    def sample_rollouts(self, batch_size):
+        indices = self.rng.integers(low=0, high=len(self), size=(batch_size,))
+        observations, actions, rewards, next_observations, dones, dts = [], [], [], [], [], []
+        for idx in indices:
+            observations.append(self.obs[id])
+            actions.append(self.acs[id])
+            rewards.append(self.rews[id])
+            next_observations.append(self.next_obs[id])
+            dones.append(self.dones[id])
+            dts.append(self.dts[id])
+        return {
+            "observations": observations,
+            "actions": actions,
+            "rewards": rewards,
+            "next_observations": next_observations,
+            "dones": dones,
+            "dts": dts
+        }
+
 
 
 """

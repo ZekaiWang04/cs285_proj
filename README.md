@@ -7,6 +7,8 @@ This is a tracking document for our final project
 
 ##Next TODO##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder)
 
+##Next TODO## Consider adding a maximum trajs into the reply buffer trajs
+
 Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
 
 (Right now I don't think we need to change everything to Jax. We can use vanilla numpy for the time being and then profile our code. If it takes a nonnegligible amount of time to transfer data from GPU to CPU, we might rewrite things in Jax.)
@@ -62,6 +64,14 @@ Give up on trying to figure out why for ode_agent.update(), cpu runs faster than
 
 Latent ODE
 https://arxiv.org/pdf/1907.03907.pdf
+Introduces RNN-ODE and the variational inference based Latent ODE
+
+Augmented ODE
+https://arxiv.org/pdf/1904.01681.pdf
+Simple hack of augmenting the ode, prelude to linear encoder decoder to latent space
+
+https://arxiv.org/pdf/1810.01367.pdf
+Some even more complicated paper on latent ode for generative model, maybe we don't need this
 
 ODE Original Paper
 
