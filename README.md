@@ -3,9 +3,9 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-1. Incorporate discount in ODE training
-2. Batchify ODE training
-3. CEM
+1. ##Now Testing## Incorporate discount in ODE training
+2. ##Now Testing## Batchify ODE training
+3. ##TODO NEXT## CEM
 4. Debug why jax runs training faster on mac CPU than GPU
 5. Add fully-jaxified implementation of everything, including from environment (should be easy: jax.jit and replacing np with jnp)
 6. Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
