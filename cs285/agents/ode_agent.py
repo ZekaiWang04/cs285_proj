@@ -1,65 +1,68 @@
 from typing import Callable, Optional, Tuple, Sequence
 import numpy as np
-import torch.nn as nn
-import torch
 import gym
 from cs285.infrastructure import pytorch_util as ptu
 from torchdiffeq import odeint
+from tqdm import trange
+import jax
+import jax.numpy as jnp
+import equinox as eqx
+import diffrax
+from diffrax import diffeqsolve, Dopri5
+import optax
 
-class NeuralODE(nn.Module):
+class NeuralODE(eqx.Module):
     _str_to_activation = {
-        "relu": nn.ReLU(),
-        "tanh": nn.Tanh(),
-        "leaky_relu": nn.LeakyReLU(),
-        "sigmoid": nn.Sigmoid(),
-        "selu": nn.SELU(),
-        "softplus": nn.Softplus(),
-        "identity": nn.Identity(),
+        "relu": jax.nn.relu,
+        "tanh": jax.nn.tanh,
+        "leaky_relu": jax.nn.leaky_relu,
+        "sigmoid": jax.nn.sigmoid,
+        "selu": jax.nn.selu,
+        "softplus": jax.nn.softplus,
+        "identity": lambda x: x,
     }
-    def __init__(self, hidden_dims, ob_dim, ac_dim, activation="relu", output_activation='identity'):
+    mlp: eqx.nn.MLP
+    def __init__(
+            self,
+            hidden_size,
+            num_layers,
+            ob_dim,
+            ac_dim,
+            key,
+            activation="relu",
+            output_activation="identity",
+        ):
         super().__init__()
-        self.ac_dim = ac_dim
-        self.ob_dim = ob_dim
         activation = self._str_to_activation[activation]
         output_activation = self._str_to_activation[output_activation]
-        layers = []
-        hidden_dims = [ob_dim + ac_dim] + hidden_dims
-        for n in range(len(hidden_dims) - 1):
-            layers.append(nn.Linear(hidden_dims[n], hidden_dims[n+1]))
-            layers.append(activation)
-        layers.append(nn.Linear(hidden_dims[-1], ob_dim))
-        layers.append(output_activation)
-        self.net = nn.Sequential(*layers)
+        # hidden_size is an integer
+        self.mlp = eqx.nn.MLP(in_size=ob_dim+ac_dim,
+                              out_size=ob_dim,
+                              width_size=hidden_size,
+                              depth=num_layers,
+                              activation=activation,
+                              final_activation=output_activation,
+                              key=key)
 
-        for m in self.net.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, mean=0, std=0.1)
-                nn.init.constant_(m.bias, val=0)
+    @eqx.filter_jit
+    def __call__(self, t, y, args):
+        # args is a dictionary that contains times and actions
+        times = args["times"] # (ep_len,)
+        actions = args["actions"] # (ep_len, ac_dim)
+        idx = jnp.searchsorted(times, t, side="right") - 1
+        action = actions[idx] # (ac_dim)
+        # althoug I believe this should also work for batched
+        return self.mlp(jnp.concatenate((y, action), axis=-1))
     
-    def update_action(self, actions: torch.Tensor, times: torch.Tensor):
-        ep_len = actions.shape[0]
-        assert actions.shape == (ep_len, self.ac_dim) and times.shape == (ep_len,)
-        # times = times - times[0] # start with t=0
-        # right now, do not assume t0 = 0
-        self.register_buffer("times", times)
-        self.register_buffer("actions", actions)
-
-    def _get_action(self, t):
-        idx = torch.searchsorted(self.times, t, right=True) - 1
-        return self.actions[idx]
-
-    def forward(self, t, y):
-        ac = self._get_action(t)
-        return self.net(torch.cat((y, ac), dim=-1))
-
-    
-class ODEAgent(nn.Module):
+class ODEAgent():
     def __init__(
         self,
         env: gym.Env,
-        hidden_dims: Sequence[int],
-        make_optimizer: Callable[[nn.ParameterList], torch.optim.Optimizer],
+        key: jax.random.PRNGKey,
+        hidden_size: int,
+        num_layers: int,
         ensemble_size: int,
+        train_timestep: float,
         mpc_horizon_steps: int,
         mpc_timestep: float,
         mpc_strategy: str,
@@ -68,10 +71,12 @@ class ODEAgent(nn.Module):
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
         activation: str = "relu",
-        output_activation: str = "identity"
+        output_activation: str = "identity",
+        lr: float=0.001
     ):
-        super().__init__()
+        # super().__init__()
         self.env = env
+        self.train_timestep = train_timestep
         self.mpc_horizon_steps = mpc_horizon_steps # in terms of timesteps
         self.mpc_strategy = mpc_strategy
         self.mpc_num_action_sequences = mpc_num_action_sequences
@@ -93,22 +98,24 @@ class ODEAgent(nn.Module):
         self.ac_dim = env.action_space.shape[0]
 
         self.ensemble_size = ensemble_size
-        self.ode_functions = nn.ModuleList(
-            [
-                NeuralODE(
-                    hidden_dims,
-                    self.ob_dim,
-                    self.ac_dim,
-                    activation,
-                    output_activation
-                ).to(ptu.device)
-                for _ in range(ensemble_size)
-            ]
-        )
-        self.optimizer = make_optimizer(self.ode_functions.parameters())
-        self.loss_fn = nn.MSELoss()
+        keys = jax.random.split(key, ensemble_size)
+        self.ode_functions = [NeuralODE(
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            ob_dim=self.ob_dim,
+            ac_dim=self.ac_dim,
+            activation=activation,
+            output_activation=output_activation,
+            key = keys[n]
+            ) for n in range(ensemble_size)]
+        self.optims = [optax.adamw(lr) for _ in range(ensemble_size)]
+        self.optim_states = [self.optims[n].init(eqx.filter(self.ode_functions[n], eqx.is_array)) for n in range(self.ensemble_size)]
 
-    def update(self, i: int, obs: np.ndarray, acs: np.ndarray, times: np.ndarray):
+        self.solver = Dopri5()
+    
+    # I believe only jitting the top level function should work...
+    # need testing/reading to support this "conjecture"
+    def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
         """
         Update self.dynamics_models[i] using the given trajectory
 
@@ -118,48 +125,112 @@ class ODEAgent(nn.Module):
             acs: (ep_len, ac_dim)
             times: (ep_len)
         """
-        obs = ptu.from_numpy(obs)
-        acs = ptu.from_numpy(acs)
-        times = ptu.from_numpy(times)
-        ode_func = self.ode_functions[i]
-        ode_func.update_action(acs, times)
-        ode_out = odeint(ode_func, obs[0, :], times) # t0 = times[0] in torchdiffeq
-        # possible problem: the ode function is only "evaluating" on times
-        # I am not sure whether there is an implicit dt or dt[i] = times[i+1] - times[i]
-        # I know for diffrax in jax, there is a separate dt argument passed into odeint()
-        assert ode_out.shape == obs.shape
-        loss = self.loss_fn(ode_out, obs)
+        # TODO: add discount, train_length
+        # Note: the discount will mess with the loss, so if we want to 
+        # compare "training" effect with different discount, we can't 
+        # really do that
+        assert 0 < discount <= 1
+        ep_len = obs.shape[0]
+        assert obs.shape == (ep_len, self.ob_dim)
+        assert acs.shape == (ep_len, self.ac_dim)
+        assert times.shape == (ep_len,)
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        discount_array = discount ** jnp.arange(ep_len)[..., jnp.newaxis]
 
-        return ptu.to_numpy(loss)
-    
-    def update_statistics(self, **kwargs):
-        pass
+        @eqx.filter_jit
+        @eqx.filter_value_and_grad
+        def loss_grad(ode_func):
+            sol = diffeqsolve(
+                diffrax.ODETerm(ode_func), 
+                self.solver, 
+                t0=times[0], 
+                t1=times[-1],
+                dt0=self.train_timestep,
+                y0 = obs[0, :],
+                args={"times": times, "actions": acs},
+                saveat=diffrax.SaveAt(ts=times)
+            )
+            assert sol.ys.shape == obs.shape == (ep_len, self.ob_dim)
+            return jnp.mean(discount_array * (sol.ys - obs) ** 2) # do we want a  "discount"-like trick
 
-    @torch.no_grad()
-    def evaluate_action_sequences(self, obs: np.ndarray, acs: np.ndarray):
-        obs = ptu.from_numpy(obs) # (ob_dim)
-        acs_np = acs
-        acs = ptu.from_numpy(acs) # (N, steps, ac_dim)
-        times = torch.linspace(0, (self.mpc_horizon_steps - 1) * self.mpc_timestep, self.mpc_horizon_steps, device=ptu.device)
-        reward_arr = np.zeros((self.mpc_num_action_sequences, self.ensemble_size))
-        for n in range(self.mpc_num_action_sequences):
+        @eqx.filter_jit
+        def make_step(ode_func, optim, opt_state):
+            loss, grad = loss_grad(ode_func)
+            updates, opt_state = optim.update(grad, opt_state, ode_func)
+            ode_func = eqx.apply_updates(ode_func, updates)
+            return loss, ode_func, opt_state
+        
+        ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
+        loss, ode_func, opt_state = make_step(ode_func, optim, opt_state)
+        self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
+        return loss.item()
+
+    def batched_update_gd(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray, discount: float=1.0):
+        assert 0 < discount <= 1
+        batch_size, ep_len = times.shape[0], times.shape[1]
+        assert times.shape == (batch_size, ep_len)
+        assert obs.shape == (batch_size, ep_len, self.ob_dim)
+        assert acs.shape == (batch_size, ep_len, self.ac_dim)
+
+        discount_array = discount ** jnp.arange(ep_len)[..., jnp.newaxis]
+        ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
+
+        @eqx.filter_jit
+        @eqx.filter_value_and_grad
+        def get_batchified_loss(ode_func, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
+            def get_single_loss(ob: jnp.ndarray, ac: jnp.ndarray, time: jnp.ndarray):
+                assert ob.shape == (ep_len, self.ob_dim)
+                assert ac.shape == (ep_len, self.ac_dim)
+                assert time.shape == (ep_len,)
+                sol = diffeqsolve(
+                    terms=diffrax.ODETerm(ode_func),
+                    solver=self.solver,
+                    t0=time[0],
+                    t1=time[-1],
+                    dt0=self.train_timestep,
+                    y0=ob[0],
+                    args={"times": time, "actions": ac},
+                    saveat=diffrax.SaveAt(ts=time)
+                )
+                assert sol.ys.shape == ob.shape == (ep_len, self.ob_dim)
+                return jnp.mean(discount_array * (sol.ys - ob) ** 2)
+            losses = jax.vmap(get_single_loss)(obs, acs, times)
+            return jnp.mean(losses)
+        
+        loss, grad = get_batchified_loss(ode_func, obs, acs, times)
+        updates, opt_state = optim.update(grad, opt_state, ode_func)
+        ode_func = eqx.apply_updates(ode_func, updates)
+        self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
+        return loss.item()
+
+    @eqx.filter_jit
+    def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray):
+        times = jnp.linspace(0, (self.mpc_horizon_steps - 1) * self.mpc_timestep, self.mpc_horizon_steps)
+
+        def evaluate_single_sequence(ac):
+            avg_rewards = jnp.zeros((self.ensemble_size,))
             for i in range(self.ensemble_size):
                 ode_func = self.ode_functions[i]
-                ode_func.update_action(acs[n, :, :], times)
-                ode_out = odeint(ode_func, obs, times) # (steps, ob_dim)
-                rewards, _ = self.env.get_reward(ptu.to_numpy(ode_out), acs_np[n, :, :])
-                avg_reward = np.mean(rewards)
-                reward_arr[n, i] = avg_reward
-        return np.mean(reward_arr, axis=1)
-    # maybe I should manually implement batched Euler solver
-    # to make inference faster
+                ode_out = diffeqsolve(
+                    terms=diffrax.ODETerm(ode_func),
+                    solver=self.solver,
+                    t0=times[0],
+                    t1=times[-1],
+                    dt0=self.mpc_timestep,
+                    y0=obs,
+                    args={"times": times, "actions": ac},
+                    saveat=diffrax.SaveAt(ts=times)
+                )
+                rewards, _ = self.env.get_reward_jnp(ode_out.ys, ac)
+                avg_rewards.at[i].set(jnp.mean(rewards))
+            return jnp.mean(avg_rewards)
+        
+        avg_rewards = jax.vmap(evaluate_single_sequence)(acs) # (seqs,)
+        assert avg_rewards.shape == (self.mpc_num_action_sequences,)
+        return avg_rewards
 
-    @torch.no_grad()
-    def get_action(self, obs: np.ndarray):
+    @eqx.filter_jit
+    def get_action(self, obs: jnp.ndarray, key: jax.random.PRNGKey):
         """
         Choose the best action using model-predictive control.
 
@@ -167,17 +238,18 @@ class ODEAgent(nn.Module):
             obs: (ob_dim,)
         """
         # always start with uniformly random actions
-        actions = np.random.uniform(
-            self.env.action_space.low,
-            self.env.action_space.high,
-            size=(self.mpc_num_action_sequences, self.mpc_horizon_steps, self.ac_dim),
+        actions = jax.random.uniform(
+            key=key,
+            minval=self.env.action_space.low,
+            maxval=self.env.action_space.high,
+            shape=(self.mpc_num_action_sequences, self.mpc_horizon_steps, self.ac_dim),
         )
 
         if self.mpc_strategy == "random":
             # evaluate each action sequence and return the best one
             rewards = self.evaluate_action_sequences(obs, actions)
             assert rewards.shape == (self.mpc_num_action_sequences,)
-            best_index = np.argmax(rewards)
+            best_index = jnp.argmax(rewards)
             return actions[best_index, 0, :]
         elif self.mpc_strategy == "cem":
             raise NotImplementedError
