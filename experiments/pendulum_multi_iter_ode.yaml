@@ -28,3 +28,4 @@ train_batch_size: 64
 num_iters: 20
 num_agent_train_steps_per_iter: 100
 num_eval_trajectories: 10
+replay_buffer_capacity: 1000

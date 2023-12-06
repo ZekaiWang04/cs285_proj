@@ -55,7 +55,7 @@ def run_training_loop_ode(
 
     # initialize agent
     mb_agent = ODEAgent(env, **config["agent_kwargs"])
-    replay_buffer = ReplayBufferTrajectories(seed=args.seed)
+    replay_buffer = ReplayBufferTrajectories(seed=args.seed, capacity=config["replay_buffer_capacity"])
     actor_agent = mb_agent
 
     total_envsteps = 0
@@ -109,6 +109,7 @@ def run_training_loop_ode(
             all_losses.append(np.mean(step_losses))
 
         """
+        # this block will cause some weird error
         # on iteration 0, plot the full learning curve
         if itr == 0:
             plt.plot(all_losses)

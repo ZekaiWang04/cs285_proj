@@ -81,7 +81,7 @@ class PendulumEnv(gym.Env):
       The default value is g = 10.0 .
 
     ```
-    gym.make('Pendulum-v1', g=9.81)
+    gym.make('pendulum-cs285-v0', g=9.81)
     ```
 
     ### Version History
@@ -127,7 +127,7 @@ class PendulumEnv(gym.Env):
         )
         self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
 
-    def _single_step(self, u, step):
+    def _single_step(self, u, dt):
         th, thdot = self.state  # th := theta
 
         g = self.g
@@ -136,9 +136,9 @@ class PendulumEnv(gym.Env):
 
         u = np.clip(u, -self.max_torque, self.max_torque)[0]
 
-        newthdot = thdot + (3 * g / (2 * l) * np.sin(th) + 3.0 / (m * l**2) * u) * step
+        newthdot = thdot + (3 * g / (2 * l) * np.sin(th) + 3.0 / (m * l**2) * u) * dt
         newthdot = np.clip(newthdot, -self.max_speed, self.max_speed)
-        newth = th + newthdot * step
+        newth = th + newthdot * dt
 
         self.state = np.array([newth, newthdot])
 

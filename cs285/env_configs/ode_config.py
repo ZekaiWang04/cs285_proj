@@ -26,7 +26,7 @@ def ode_config(
     trajs: int = 100,  # number of transitions to collect per per iteration thereafter
     train_batch_size: int = 64,  # number of transitions to train each dynamics model per iteration
     num_iters: int = 20,
-    replay_buffer_capacity: int = 1000000,
+    replay_buffer_capacity: int = 1000,
     num_agent_train_steps_per_iter: int = 100,
     num_eval_trajectories: int = 10,
     hidden_size: int = 32,
