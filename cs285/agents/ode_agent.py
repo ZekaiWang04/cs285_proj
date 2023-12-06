@@ -50,7 +50,7 @@ class NeuralODE(eqx.Module):
         times = args["times"] # (ep_len,)
         actions = args["actions"] # (ep_len, ac_dim)
         idx = jnp.searchsorted(times, t, side="right") - 1
-        action = actions[idx] # (ac_dim)
+        action = actions[idx] # (ac_dim,)
         # althoug I believe this should also work for batched
         return self.mlp(jnp.concatenate((y, action), axis=-1))
     
@@ -64,6 +64,7 @@ class ODEAgent():
         ensemble_size: int,
         train_timestep: float,
         mpc_horizon_steps: int,
+        mpc_discount: float,
         mpc_timestep: float,
         mpc_strategy: str,
         mpc_num_action_sequences: int,
@@ -78,6 +79,8 @@ class ODEAgent():
         self.env = env
         self.train_timestep = train_timestep
         self.mpc_horizon_steps = mpc_horizon_steps # in terms of timesteps
+        assert 0 < mpc_discount <= 1
+        self.mpc_discount = mpc_discount
         self.mpc_strategy = mpc_strategy
         self.mpc_num_action_sequences = mpc_num_action_sequences
         self.cem_num_iters = cem_num_iters
@@ -209,7 +212,7 @@ class ODEAgent():
         return loss.item()
 
     @eqx.filter_jit
-    def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray):
+    def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
         times = jnp.linspace(0, (self.mpc_horizon_steps - 1) * self.mpc_timestep, self.mpc_horizon_steps)
 
         def evaluate_single_sequence(ac):
@@ -227,7 +230,7 @@ class ODEAgent():
                     saveat=diffrax.SaveAt(ts=times)
                 )
                 rewards, _ = self.env.get_reward_jnp(ode_out.ys, ac)
-                avg_rewards.at[i].set(jnp.mean(rewards))
+                avg_rewards.at[i].set(jnp.mean(rewards * mpc_discount_arr))
             return jnp.mean(avg_rewards)
         
         avg_rewards = jax.vmap(evaluate_single_sequence)(acs) # (seqs,)
@@ -243,20 +246,37 @@ class ODEAgent():
             obs: (ob_dim,)
         """
         # always start with uniformly random actions
-        actions = jax.random.uniform(
-            key=key,
+        acs_key, key = jax.random.split(key)
+        action_sequences = jax.random.uniform(
+            key=acs_key,
             minval=self.env.action_space.low,
             maxval=self.env.action_space.high,
             shape=(self.mpc_num_action_sequences, self.mpc_horizon_steps, self.ac_dim),
         )
+        mpc_discount_arr = self.mpc_discount ** jnp.arange(self.mpc_horizon_steps)
 
         if self.mpc_strategy == "random":
             # evaluate each action sequence and return the best one
-            rewards = self.evaluate_action_sequences(obs, actions)
+            rewards = self.evaluate_action_sequences(obs, action_sequences, mpc_discount_arr)
             assert rewards.shape == (self.mpc_num_action_sequences,)
             best_index = jnp.argmax(rewards)
-            return actions[best_index, 0, :]
+            return action_sequences[best_index, 0, :]
         elif self.mpc_strategy == "cem":
-            raise NotImplementedError
+            elite_mean, elite_std = None, None
+            for i in range(self.cem_num_iters):
+                if i == 0:
+                    elite_mean = np.mean(action_sequences, axis=0)
+                    elite_std = np.std(action_sequences, axis=0)
+                assert elite_mean.shape == (self.mpc_horizon_steps, self.ac_dim)
+                assert elite_std.shape == (self.mpc_horizon_steps, self.ac_dim)
+                acs_key, key = jax.random.split(key)
+                action_sequences = elite_mean + elite_std * jax.random.normal(key=acs_key, shape=(self.mpc_num_action_sequences, self.mpc_horizon_steps, self.ac_dim))
+                # action_sequences = jnp.clip(action_sequences, self.env.action_space.low, self.env.action_space.high)
+                rewards = self.evaluate_action_sequences(obs, action_sequences, mpc_discount_arr)
+                top_j_idx = jnp.argsort(rewards)[-self.cem_num_elites:]
+                top_j_acs = action_sequences[top_j_idx]
+                elite_mean = (1 - self.cem_alpha) * elite_mean + self.cem_alpha * jnp.mean(top_j_acs, axis=0)
+                elite_std = (1 - self.cem_alpha) * elite_std + self.cem_alpha * jnp.std(top_j_acs, axis=0)
+            return jnp.clip(elite_mean[0], self.env.action_space.low, self.env.action_space.high)
         else:
             raise ValueError(f"Invalid MPC strategy '{self.mpc_strategy}'")

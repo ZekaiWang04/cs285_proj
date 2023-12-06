@@ -3,12 +3,13 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-1. ##Implementing## CEM
-2. ##Next TODO## Debug why jax runs training faster on mac CPU than GPU
-3. Add fully-jaxified implementation of everything, including from environment (should be easy: jax.jit and replacing np with jnp)
-4. Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
-5. Change ODE structure, for example try latent ode, possibly incorporating action
-6. Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
+Add fully-jaxified implementation of everything, including from environment (should be easy: jax.jit and replacing np with jnp)
+
+Change the run script / parsing to have different training setups (for example train with fixed length, discount, or other tricks)
+
+Change ODE structure, for example try latent ode, possibly incorporating action
+
+Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
 
 ### Experiments
 
@@ -51,6 +52,12 @@ see ```notebooks/test_ode_agent_jax.ipynb```
 
 Batchify ODE training (i.e. batched SGD)
 see ```notebooks/test_ode_agent_jax.ipynbw```
+
+Implemented CEM
+
+Implemented skeleton for ode_agent_true_dynamics
+
+Give up on trying to figure out why for ode_agent.update(), cpu runs faster than gpu. Deperated it in favor of the faster ode_agent.batch_update().
 
 ## Possible References
 
