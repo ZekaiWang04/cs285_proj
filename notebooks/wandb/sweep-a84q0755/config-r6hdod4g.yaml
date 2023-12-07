@@ -1,0 +1,18 @@
+wandb_version: 1
+
+cem_alpha:
+  value: 0.8
+cem_num_elites:
+  value: 4
+cem_num_iters:
+  value: 4
+mpc_discount:
+  value: 0.9
+mpc_horizon_steps:
+  value: 200
+mpc_num_action_sequences:
+  value: 100
+mpc_strategy:
+  value: random
+mpc_timestep:
+  value: 0.05

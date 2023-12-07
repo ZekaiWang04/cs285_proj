@@ -40,24 +40,15 @@ class ODEAgent_True_Dynamics(ODEAgent):
     def __init__(
         self,
         env: gym.Env,
-        key: jax.random.PRNGKey,
         mpc_horizon_steps: int,
         mpc_discount: float,
         mpc_timestep: float,
         mpc_strategy: str,
         mpc_num_action_sequences: int,
-        hidden_size=16, # just for convenience
-        num_layers=1, # just for convenience
-        ensemble_size=1, # just for convenience
-        train_timestep=None,
-        train_discount=1, # just for convenience
         true_dynamics: Callable = pendulum_true_dynamics, # e.g. pendulum_true_dynamics
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
-        activation: str = "relu",
-        output_activation: str = "identity",
-        lr: float=0.001
     ):
         super().__init__(
             env=env,
@@ -77,7 +68,6 @@ class ODEAgent_True_Dynamics(ODEAgent):
             cem_alpha=cem_alpha,
         )
         self.ode_functions = None
-        self.ensemble_size = ensemble_size
         self.optims = None
         self.optim_states = None
         self.true_dynamics = true_dynamics
