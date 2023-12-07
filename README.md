@@ -5,9 +5,11 @@ This is a tracking document for our final project
 ### Implementation
 ##Next TODO##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder)
 
-##Next TODO## Consider adding a maximum trajs into the reply buffer trajs
-
 ##Next TODO## parallelize ensemble updates with jax vmap, if possible
+
+Have a mpc_dt_sampler and ensemble over different dt distributions?
+
+Be careful of dt
 
 Examine why on the notebook training is lightning speed while on the script it takes so long
 

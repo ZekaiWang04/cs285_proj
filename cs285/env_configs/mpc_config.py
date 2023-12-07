@@ -19,9 +19,12 @@ def mpc_config(
     mpc_horizon: int = 10,
     mpc_strategy: str = "random",
     mpc_num_action_sequences: int = 1000,
+    mpc_discount: float = 1.0,
+    mpc_dt: float = 0.05,
     cem_num_iters: Optional[int] = None,
     cem_num_elites: Optional[int] = None,
     cem_alpha: Optional[float] = None,
+    mode: str="vanilla",
     initial_batch_size: int = 20000,  # number of transitions to collect with random policy at the start
     batch_size: int = 8000,  # number of transitions to collect per per iteration thereafter
     train_batch_size: int = 512,  # number of transitions to train each dynamics model per iteration
@@ -66,10 +69,13 @@ def mpc_config(
             "ensemble_size": ensemble_size,
             "mpc_horizon": mpc_horizon,
             "mpc_strategy": mpc_strategy,
+            "mpc_discount": mpc_discount,
+            "mpd_dt": mpc_dt,
             "mpc_num_action_sequences": mpc_num_action_sequences,
             "cem_num_iters": cem_num_iters,
             "cem_num_elites": cem_num_elites,
             "cem_alpha": cem_alpha,
+            "mode": mode
         },
         "make_env": make_env,
         "replay_buffer_capacity": replay_buffer_capacity,

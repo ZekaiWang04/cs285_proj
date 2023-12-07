@@ -140,7 +140,8 @@ class ReplayBufferTrajectories():
     # rollouts with different lengths
     # But I can also do something like having a cutoff_length
     # and a auxiliary value indicating how long each rollout is
-    def __init__(self, seed=0):
+    def __init__(self, seed=0, capacity=1000):
+        self.capacity = capacity
         self.rng = np.random.default_rng(seed)
         # store each rollout
         self.paths = []
@@ -164,6 +165,7 @@ class ReplayBufferTrajectories():
         # add new rollouts into our list of rollouts
         for path in paths:
             self.paths.append(path)
+        self.paths = self.paths[-self.capacity:]
 
         # convert new rollouts into their component arrays, and append them onto
         # our arrays
@@ -175,19 +177,25 @@ class ReplayBufferTrajectories():
         dts = [path["dt"] for path in paths]
 
         if self.obs is None:
-            self.obs = observations
-            self.acs = actions
-            self.rews = rewards
-            self.next_obs = next_observations
-            self.dones = dones
-            self.dts = dts
+            self.obs = observations[-self.capacity:]
+            self.acs = actions[-self.capacity:]
+            self.rews = rewards[-self.capacity:]
+            self.next_obs = next_observations[-self.capacity:]
+            self.dones = dones[-self.capacity:]
+            self.dts = dts[-self.capacity:]
         else:
             self.obs.extend(observations)
+            self.obs = self.obs[-self.capacity:]
             self.acs.extend(actions)
+            self.acs = self.acs[-self.capacity:]
             self.rews.extend(rewards)
+            self.rews = self.rews[-self.capacity:]
             self.next_obs.extend(next_observations)
+            self.next_obs = self.next_obs[-self.capacity:]
             self.dones.extend(dones)
+            self.dones = self.dones[-self.capacity:]
             self.dts.extend(dts)
+            self.dts = self.dts[-self.capacity:]
 
     def sample_rollout(self):
         # samples and returns a single rollout
