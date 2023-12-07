@@ -11,9 +11,13 @@ Have a mpc_dt_sampler and ensemble over different dt distributions?
 
 Be careful of dt
 
-Examine why on the notebook training is lightning speed while on the script it takes so long
+Jaxify mpc sample, maybe use jax for everything and then we can ditch ptu and torch. We can also fully jaxify everthing
 
-Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
+Examine why on the notebook training is lightning speed while on the script it takes so long ("solution": use jupyter notebooks to do experiments!!!)
+
+##TODO## Get the true dynamics in the ode_agent_true_dynamics.py
+
+##Now Testing## Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
 
 (Right now I don't think we need to change everything to Jax. We can use vanilla numpy for the time being and then profile our code. If it takes a nonnegligible amount of time to transfer data from GPU to CPU, we might rewrite things in Jax.)
 ### Experiments

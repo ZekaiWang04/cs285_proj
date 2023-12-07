@@ -214,7 +214,7 @@ class ModelBasedAgent(nn.Module):
 
         discount = 1
 
-        for n in action_sequences.shape[1]:
+        for n in range(action_sequences.shape[1]):
             acs = action_sequences[:, n, :]
             assert acs.shape == (self.mpc_num_action_sequences, self.ac_dim)
             assert obs.shape == (
