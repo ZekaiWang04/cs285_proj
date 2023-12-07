@@ -12,29 +12,52 @@ import diffrax
 from diffrax import diffeqsolve, Dopri5
 import optax
 
+def angle_normalize(x):
+    return ((x + jnp.pi) % (2 * jnp.pi)) - jnp.pi
 
 @eqx.filter_jit
-def pendulum_true_dynamics(self, t, y, args):
+def pendulum_true_dynamics(t, y, args):
     times = args["times"] # (ep_len)
     actions = args["actions"] # (ep_len, ac_dim)
     idx = jnp.searchsorted(times, t, side="right") - 1
     action = actions[idx] # (ac_dim,)
-    return #TODO: get the true dynamics of the pendulum environment
+    
+    cos_theta, sin_theta, thdot = y
+    th = angle_normalize(jnp.arctan2(sin_theta, cos_theta))
+    max_speed = 8
+    max_torque = 2.0
+    g = 10.0
+    m = 1.0
+    l = 1.0
+    u = jnp.clip(action, -max_torque, max_torque)[0]
+    newthdot = thdot + (3 * g / (2 * l) * sin_theta + 3.0 / (m * l**2) * u) * (times[idx+1] - times[idx])
+    newthdot = np.clip(newthdot, -max_speed, max_speed)
+    newth = th + newthdot * (times[idx+1] - times[idx])
+    return jnp.asarray([-jnp.sin(newth) * newthdot, jnp.cos(newth) * newthdot, 3 * g / (2 * l) * sin_theta + 3.0 / (m * l**2) * u])
 
 
 class ODEAgent_True_Dynamics(ODEAgent):
     def __init__(
         self,
         env: gym.Env,
-        true_dynamics: Callable, # e.g. pendulum_true_dynamics
+        key: jax.random.PRNGKey,
         mpc_horizon_steps: int,
         mpc_discount: float,
         mpc_timestep: float,
         mpc_strategy: str,
         mpc_num_action_sequences: int,
+        hidden_size=16, # just for convenience
+        num_layers=1, # just for convenience
+        ensemble_size=1, # just for convenience
+        train_timestep=None,
+        train_discount=1, # just for convenience
+        true_dynamics: Callable = pendulum_true_dynamics, # e.g. pendulum_true_dynamics
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
+        activation: str = "relu",
+        output_activation: str = "identity",
+        lr: float=0.001
     ):
         super().__init__(
             env=env,
@@ -54,7 +77,7 @@ class ODEAgent_True_Dynamics(ODEAgent):
             cem_alpha=cem_alpha,
         )
         self.ode_functions = None
-        self.ensemble_size = None
+        self.ensemble_size = ensemble_size
         self.optims = None
         self.optim_states = None
         self.true_dynamics = true_dynamics
