@@ -1,9 +1,6 @@
-from typing import Callable, Optional, Tuple, Sequence
+from typing import Optional
 import numpy as np
 import gym
-from cs285.infrastructure import pytorch_util as ptu
-from torchdiffeq import odeint
-from tqdm import trange
 import jax
 import jax.numpy as jnp
 import equinox as eqx
