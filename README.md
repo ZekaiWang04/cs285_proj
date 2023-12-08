@@ -7,9 +7,12 @@ This is a tracking document for our final project
 
 Be careful of dt
 
-Jaxify everything and then we can ditch ptu and torch.
+##Now testing, but beware baselines might need pytorch to run!## Jaxify everything and then we can ditch ptu and torch.
 
 Examine why on the notebook training is lightning speed while on the script it takes so long ("solution": use jupyter notebooks to do experiments!!!)
+
+mpc_steps versus mpc_time
+
 ### Experiments
 
 1. Dyamic learning with ODE 
@@ -87,3 +90,21 @@ ODE PhD Thesis
 Jax
 
 The Continuous-time Model Based
+
+
+## Kyle's Final Advice
+CEM fast, Random Shooting, 
+cem caveate: sampling absed planners depend on sampler distribution, might want importance sampling, e.g. splines in action space? 
+
+DOn't want completely random noise for generating action (b/c random continuous action tends to cancel out each other, think about martingales/brownian motion), have some time-coreelated noise, e.g. random polinomials in time where the polynocials are random, 
+
+mujoco: collision might not work well! 
+try continuous environments first before collisions
+
+compare against ODE SAC and other baseline
+
+e.g. out of distribution case to see if policy generalizes better / dynamoics model generalizes better
+
+Out of Distribution: say change the physics (e.g. mass, length); can compare zero short or time takes to "retrain". Also, dynamic should be reward-agnostic, so if we can have a favorable environement for our ode based agent if we tweak the reward, say penalize torque more or less
+
+Sparse Reward: should work

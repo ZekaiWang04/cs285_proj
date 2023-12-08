@@ -59,6 +59,9 @@ class ODEAgent():
         key: jax.random.PRNGKey,
         hidden_size: int,
         num_layers: int,
+        activation: str,
+        output_activation: str,
+        lr: float,
         ensemble_size: int,
         train_timestep: float,
         train_discount: float,
@@ -70,9 +73,6 @@ class ODEAgent():
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
-        activation: str = "relu",
-        output_activation: str = "identity",
-        lr: float=0.001
     ):
         # super().__init__()
         self.env = env
@@ -212,7 +212,7 @@ class ODEAgent():
 
     @eqx.filter_jit
     def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
-        dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps))
+        dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps,))
         times = jnp.cumsum(dts) # (self.mpc_horizon_steps, )
 
         def evaluate_single_sequence(ac):
