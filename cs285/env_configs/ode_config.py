@@ -45,7 +45,7 @@ def ode_config(
         ep_len = 200
 
     assert train_ep_len <= ep_len
-
+    dt_sampler_kwargs['key'] = key
     dt_sampler = {
         "constant": ConstantSampler,
         "uniform": UniformSampler,
@@ -58,6 +58,7 @@ def ode_config(
                      dt_sampler=dt_sampler,
                      render_mode="single_rgb_array" if render else None), )
 
+    mpc_dt_sampler_kwargs['key'] = key
     mpc_dt_sampler = {
         "constant": ConstantSampler,
         "uniform": UniformSampler,
