@@ -6,57 +6,63 @@ from cs285.envs.dt_sampler import BaseSampler, ConstantSampler, UniformSampler, 
 
 
 def ode_config(
-    env_name: str,
-    exp_name: str,
-    key: jax.random.PRNGKey = jax.random.PRNGKey(0),
-    dt_sampler_name: str = "constant",
-    dt_sampler_kwargs: dict={"dt": 0.05},
-    learning_rate: float = 1e-3,
-    ensemble_size: int = 3,
-    mpc_horizon_steps: int = 100,
-    mpc_discount: float = 1.0,
-    mpc_strategy: str = "random",
-    mpc_num_action_sequences: int = 1000,
-    mpc_dt_sampler_name: str = "constant",
-    mpc_dt_sampler_kwargs: dict = {"dt": 0.05},
-    cem_num_iters: Optional[int] = None,
-    cem_num_elites: Optional[int] = None,
-    cem_alpha: Optional[float] = None,
-    initial_trajs: int = 100,  # number of trajectories to collect with random policy at the start
-    trajs: int = 100,  # number of transitions to collect per per iteration thereafter
-    train_batch_size: int = 64,  # number of transitions to train each dynamics model per iteration
-    num_iters: int = 20,
-    replay_buffer_capacity: int = 1000,
-    num_agent_train_steps_per_iter: int = 100,
-    num_eval_trajectories: int = 10,
-    hidden_size: int = 32,
-    num_layers: int = 4,
-    activation: str = "relu",
-    output_activation: str = "identity",
-    train_timestep: float = 0.005,
-    train_discount: float = 1.0,
-    train_ep_len: int=200,
-    train_stride: int=1
-):
+        env_name: str,
+        exp_name: str,
+        key: jax.random.PRNGKey = jax.random.PRNGKey(0),
+        dt_sampler_name: str = "constant",
+        dt_sampler_kwargs: dict = {"dt": 0.05},
+        learning_rate: float = 1e-3,
+        ensemble_size: int = 3,
+        mpc_horizon_steps: int = 100,
+        mpc_discount: float = 1.0,
+        mpc_strategy: str = "random",
+        mpc_num_action_sequences: int = 1000,
+        mpc_dt_sampler_name: str = "constant",
+        mpc_dt_sampler_kwargs: dict = {"dt": 0.05},
+        cem_num_iters: Optional[int] = None,
+        cem_num_elites: Optional[int] = None,
+        cem_alpha: Optional[float] = None,
+        initial_trajs:
+    int = 100,  # number of trajectories to collect with random policy at the start
+        trajs:
+    int = 100,  # number of transitions to collect per per iteration thereafter
+        train_batch_size:
+    int = 64,  # number of transitions to train each dynamics model per iteration
+        num_iters: int = 20,
+        replay_buffer_capacity: int = 1000,
+        num_agent_train_steps_per_iter: int = 100,
+        num_eval_trajectories: int = 10,
+        hidden_size: int = 32,
+        num_layers: int = 4,
+        activation: str = "relu",
+        output_activation: str = "identity",
+        train_timestep: float = 0.005,
+        train_discount: float = 1.0,
+        train_ep_len: int = 200,
+        train_stride: int = 1):
     # hardcoded for this assignment
     if env_name == "pendulum-cs285-v0":
         ep_len = 200
-    
+
     assert train_ep_len <= ep_len
 
-    dt_sampler = {"constant": ConstantSampler,
-                  "uniform": UniformSampler,
-                  "exponential": ExponentialSampler}[dt_sampler_name](**dt_sampler_kwargs)
+    dt_sampler = {
+        "constant": ConstantSampler,
+        "uniform": UniformSampler,
+        "exponential": ExponentialSampler
+    }[dt_sampler_name](**dt_sampler_kwargs)
+
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
-            gym.make(env_name, 
+            gym.make(env_name,
                      dt_sampler=dt_sampler,
-                     render_mode="single_rgb_array" if render else None),
-        )
-    
-    mpc_dt_sampler = {"constant": ConstantSampler,
-                      "uniform": UniformSampler,
-                      "exponential": ExponentialSampler}[mpc_dt_sampler_name](**mpc_dt_sampler_kwargs)
+                     render_mode="single_rgb_array" if render else None), )
+
+    mpc_dt_sampler = {
+        "constant": ConstantSampler,
+        "uniform": UniformSampler,
+        "exponential": ExponentialSampler
+    }[mpc_dt_sampler_name](**mpc_dt_sampler_kwargs)
 
     log_string = f"{env_name}_{exp_name}_hiddensize{hidden_size}_mpc{mpc_strategy}_horizon{mpc_horizon_steps}_actionseq{mpc_num_action_sequences}"
     if mpc_strategy == "cem":
