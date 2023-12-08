@@ -10,9 +10,11 @@ learning_rate: 0.001
 ensemble_size: 10
 mpc_horizon_steps: 20
 mpc_discount: 1.0
-mpc_timestep: 0.05
 mpc_strategy: random
 mpc_num_action_sequences: 1000
+mpc_dt_sampler_name: constant
+mpc_dt_sampler_kwargs:
+  dt: 0.05
 cem_num_iters: 5
 cem_num_elites: 10
 cem_alpha: 1

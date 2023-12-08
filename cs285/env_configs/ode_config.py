@@ -16,9 +16,10 @@ def ode_config(
     ensemble_size: int = 3,
     mpc_horizon_steps: int = 100,
     mpc_discount: float = 1.0,
-    mpc_timestep: float = 0.005,
     mpc_strategy: str = "random",
     mpc_num_action_sequences: int = 1000,
+    mpc_dt_sampler_name: str = "constant",
+    mpc_dt_sampler_kwargs: dict = {"dt": 0.05},
     cem_num_iters: Optional[int] = None,
     cem_num_elites: Optional[int] = None,
     cem_alpha: Optional[float] = None,
@@ -53,6 +54,10 @@ def ode_config(
                      dt_sampler=dt_sampler,
                      render_mode="single_rgb_array" if render else None),
         )
+    
+    mpc_dt_sampler = {"constant": ConstantSampler,
+                      "uniform": UniformSampler,
+                      "exponential": ExponentialSampler}[mpc_dt_sampler_name](**mpc_dt_sampler_kwargs)
 
     log_string = f"{env_name}_{exp_name}_hiddensize{hidden_size}_mpc{mpc_strategy}_horizon{mpc_horizon_steps}_actionseq{mpc_num_action_sequences}"
     if mpc_strategy == "cem":
@@ -68,9 +73,9 @@ def ode_config(
             "train_discount": train_discount,
             "mpc_horizon_steps": mpc_horizon_steps,
             "mpc_discount": mpc_discount,
-            "mpc_timestep": mpc_timestep,
             "mpc_strategy": mpc_strategy,
             "mpc_num_action_sequences": mpc_num_action_sequences,
+            "mpc_dt_sampler": mpc_dt_sampler,
             "cem_num_iters": cem_num_iters,
             "cem_num_elites": cem_num_elites,
             "cem_alpha": cem_alpha,
