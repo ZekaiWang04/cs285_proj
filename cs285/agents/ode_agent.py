@@ -7,6 +7,7 @@ import equinox as eqx
 import diffrax
 from diffrax import diffeqsolve, Dopri5
 import optax
+from cs285.envs.dt_sampler import BaseSampler
 
 class NeuralODE(eqx.Module):
     _str_to_activation = {
@@ -63,9 +64,9 @@ class ODEAgent():
         train_discount: float,
         mpc_horizon_steps: int,
         mpc_discount: float,
-        mpc_timestep: float,
         mpc_strategy: str,
         mpc_num_action_sequences: int,
+        mpc_dt_sampler: BaseSampler,
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
@@ -86,7 +87,7 @@ class ODEAgent():
         self.cem_num_iters = cem_num_iters
         self.cem_num_elites = cem_num_elites
         self.cem_alpha = cem_alpha
-        self.mpc_timestep = mpc_timestep # when evaluating
+        self.mpc_dt_sampler = mpc_dt_sampler # when evaluating
 
         assert mpc_strategy in (
             "random",
@@ -211,7 +212,8 @@ class ODEAgent():
 
     @eqx.filter_jit
     def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
-        times = jnp.linspace(0, (self.mpc_horizon_steps - 1) * self.mpc_timestep, self.mpc_horizon_steps)
+        dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps))
+        times = jnp.cumsum(dts) # (self.mpc_horizon_steps, )
 
         def evaluate_single_sequence(ac):
             avg_rewards = jnp.zeros((self.ensemble_size,))

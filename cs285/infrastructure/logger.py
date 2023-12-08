@@ -57,6 +57,7 @@ class Logger:
         """figure: matplotlib.pyplot figure handle"""
         self._summ_writer.add_figure('{}_{}'.format(name, phase), figure, step)
 
+    @DeprecationWarning
     def log_graph(self, array, name, step, phase):
         """figure: matplotlib.pyplot figure handle"""
         im = plot_graph(array)

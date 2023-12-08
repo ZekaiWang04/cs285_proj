@@ -5,7 +5,6 @@ import jax
 from cs285.networks.mlp_policy import MLPPolicy
 import gym
 import cv2
-from cs285.infrastructure import pytorch_util as ptu
 from typing import Dict, Tuple, List
 
 from tqdm import trange

@@ -1,16 +1,15 @@
-from typing import Callable, Optional, Tuple, Sequence
 import numpy as np
 import gym
-from cs285.infrastructure import pytorch_util as ptu
+from typing import Optional, Callable
 from cs285.agents.ode_agent import ODEAgent
+from cs285.envs.dt_sampler import BaseSampler
 from torchdiffeq import odeint
 from tqdm import trange
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
-from diffrax import diffeqsolve, Dopri5
-import optax
+from diffrax import diffeqsolve
 
 def angle_normalize(x):
     return ((x + jnp.pi) % (2 * jnp.pi)) - jnp.pi
@@ -42,8 +41,8 @@ class ODEAgent_True_Dynamics(ODEAgent):
         env: gym.Env,
         mpc_horizon_steps: int,
         mpc_discount: float,
-        mpc_timestep: float,
         mpc_strategy: str,
+        mpc_dt_sampler: BaseSampler,
         mpc_num_action_sequences: int,
         true_dynamics: Callable = pendulum_true_dynamics, # e.g. pendulum_true_dynamics
         cem_num_iters: Optional[int] = None,
@@ -60,8 +59,8 @@ class ODEAgent_True_Dynamics(ODEAgent):
             train_discount=1, # just for convenience
             mpc_horizon_steps=mpc_horizon_steps,
             mpc_discount=mpc_discount,
-            mpc_timestep=mpc_timestep,
             mpc_strategy=mpc_strategy,
+            mpc_dt_sampler=mpc_dt_sampler,
             mpc_num_action_sequences=mpc_num_action_sequences,
             cem_num_iters=cem_num_iters,
             cem_num_elites=cem_num_elites,
