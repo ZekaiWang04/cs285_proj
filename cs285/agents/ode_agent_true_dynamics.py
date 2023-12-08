@@ -41,8 +41,9 @@ class ODEAgent_True_Dynamics(ODEAgent):
         mpc_horizon_steps: int,
         mpc_discount: float,
         mpc_strategy: str,
-        mpc_dt_sampler: BaseSampler,
         mpc_num_action_sequences: int,
+        mpc_dt_sampler: BaseSampler,
+        mpc_timestep: float,
         true_dynamics: Callable = pendulum_true_dynamics, # e.g. pendulum_true_dynamics
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
@@ -50,17 +51,19 @@ class ODEAgent_True_Dynamics(ODEAgent):
     ):
         super().__init__(
             env=env,
-            key=jax.random.PRNGKey(0), # just for convenience
-            hidden_size=16, # just for convenience
-            num_layers=1, # just for convenience
-            ensemble_size=1, # just for convenience
-            train_timestep=None,
-            train_discount=1, # just for convenience
+            key=jax.random.PRNGKey(0), # dummy
+            mlp_dynamics_setup={"hidden_size": 32, "num_layers": 4, "activation": "relu", "output_activation": "identity"}, # dummy
+            optimizer_name="adamw", # dymmy
+            optimizer_kwargs={"lr": 1e-3}, # dummy
+            ensemble_size=1, # dummy
+            train_timestep=None, # dummy
+            train_discount=1.0, # dymmy
             mpc_horizon_steps=mpc_horizon_steps,
             mpc_discount=mpc_discount,
             mpc_strategy=mpc_strategy,
-            mpc_dt_sampler=mpc_dt_sampler,
             mpc_num_action_sequences=mpc_num_action_sequences,
+            mpc_dt_sampler=mpc_dt_sampler,
+            mpc_timestep=mpc_timestep,
             cem_num_iters=cem_num_iters,
             cem_num_elites=cem_num_elites,
             cem_alpha=cem_alpha,
@@ -78,7 +81,8 @@ class ODEAgent_True_Dynamics(ODEAgent):
 
     @eqx.filter_jit
     def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
-        times = jnp.linspace(0, (self.mpc_horizon_steps - 1) * self.mpc_timestep, self.mpc_horizon_steps)
+        dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps,))
+        times = jnp.cumsum(dts) # (self.mpc_horizon_steps, )
 
         def evaluate_single_sequence(ac):
             ode_out = diffeqsolve(

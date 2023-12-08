@@ -8,7 +8,9 @@ key: 27
 dt_sampler_name: constant
 dt_sampler_kwargs:
   dt: 0.05
-learning_rate: 0.001
+optimizer_name: adamw
+optimizer_kwargs:
+  lr: 0.001
 ensemble_size: 10
 mpc_horizon_steps: 20
 mpc_discount: 0.95
@@ -22,10 +24,12 @@ cem_num_iters: 5
 cem_num_elites: 10
 cem_alpha: 1
 
-hidden_size: 128
-num_layers: 4
-activation: relu
-output_activation: identity
+mlp_dynamics_setup:
+  hidden_size: 128
+  num_layers: 4
+  activation: relu
+  output_activation: identity
+
 train_timestep: 0.005
 train_discount: 1.0
 train_ep_len: 200

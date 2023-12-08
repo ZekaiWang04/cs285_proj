@@ -9,37 +9,32 @@ from diffrax import diffeqsolve, Dopri5
 import optax
 from cs285.envs.dt_sampler import BaseSampler
 
-class NeuralODE(eqx.Module):
-    _str_to_activation = {
-        "relu": jax.nn.relu,
-        "tanh": jax.nn.tanh,
-        "leaky_relu": jax.nn.leaky_relu,
-        "sigmoid": jax.nn.sigmoid,
-        "selu": jax.nn.selu,
-        "softplus": jax.nn.softplus,
-        "identity": lambda x: x,
-    }
+_str_to_activation = {
+    "relu": jax.nn.relu,
+    "tanh": jax.nn.tanh,
+    "leaky_relu": jax.nn.leaky_relu,
+    "sigmoid": jax.nn.sigmoid,
+    "selu": jax.nn.selu,
+    "softplus": jax.nn.softplus,
+    "identity": lambda x: x,
+}
+
+class NeuralODE_Vanilla(eqx.Module):
     mlp: eqx.nn.MLP
     def __init__(
             self,
-            hidden_size,
-            num_layers,
-            ob_dim,
-            ac_dim,
-            key,
-            activation="relu",
-            output_activation="identity",
+            mlp_dynamics_setup: dict,
+            ob_dim: int,
+            ac_dim: int,
+            key: jax.random.PRNGKey,
         ):
         super().__init__()
-        activation = self._str_to_activation[activation]
-        output_activation = self._str_to_activation[output_activation]
-        # hidden_size is an integer
         self.mlp = eqx.nn.MLP(in_size=ob_dim+ac_dim,
                               out_size=ob_dim,
-                              width_size=hidden_size,
-                              depth=num_layers,
-                              activation=activation,
-                              final_activation=output_activation,
+                              width_size=mlp_dynamics_setup["hidden_size"],
+                              depth=mlp_dynamics_setup["num_layers"],
+                              activation=_str_to_activation[mlp_dynamics_setup["activation"]],
+                              final_activation=_str_to_activation[mlp_dynamics_setup["output_activation"]],
                               key=key)
 
     @eqx.filter_jit
@@ -52,16 +47,14 @@ class NeuralODE(eqx.Module):
         # althoug I believe this should also work for batched
         return self.mlp(jnp.concatenate((y, action), axis=-1))
     
-class ODEAgent():
+class ODEAgent_Vanilla():
     def __init__(
         self,
         env: gym.Env,
         key: jax.random.PRNGKey,
-        hidden_size: int,
-        num_layers: int,
-        activation: str,
-        output_activation: str,
-        lr: float,
+        mlp_dynamics_setup: dict, # contains hidden_size: int, num_layers: int, activation: str, output_activation: str
+        optimizer_name: str,
+        optimizer_kwargs: dict,
         ensemble_size: int,
         train_timestep: float,
         train_discount: float,
@@ -105,16 +98,14 @@ class ODEAgent():
 
         self.ensemble_size = ensemble_size
         keys = jax.random.split(key, ensemble_size)
-        self.ode_functions = [NeuralODE(
-            hidden_size=hidden_size,
-            num_layers=num_layers,
+        self.ode_functions = [NeuralODE_Vanilla(
+            mlp_dynamics_setup=mlp_dynamics_setup,
             ob_dim=self.ob_dim,
             ac_dim=self.ac_dim,
-            activation=activation,
-            output_activation=output_activation,
             key = keys[n]
             ) for n in range(ensemble_size)]
-        self.optims = [optax.adamw(lr) for _ in range(ensemble_size)]
+        optimizer_class = getattr(optax, optimizer_name)
+        self.optims = [optimizer_class(**optimizer_kwargs) for _ in range(ensemble_size)]
         self.optim_states = [self.optims[n].init(eqx.filter(self.ode_functions[n], eqx.is_array)) for n in range(self.ensemble_size)]
 
         self.solver = Dopri5()
@@ -213,7 +204,10 @@ class ODEAgent():
         return loss.item()
 
     @eqx.filter_jit
-    def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
+    def evaluate_action_sequences(self, ob: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
+        # ob: (ob_dim,)
+        # acs: (mpc_num_action_sequences, mpc_horizon_steps, ac_dim)
+        # mpc_discount_arr: (mpc_horizon_steps,)
         dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps,))
         times = jnp.cumsum(dts) # (self.mpc_horizon_steps, )
 
@@ -227,7 +221,7 @@ class ODEAgent():
                     t0=times[0],
                     t1=times[-1],
                     dt0=self.mpc_timestep,
-                    y0=obs,
+                    y0=ob,
                     args={"times": times, "actions": ac},
                     saveat=diffrax.SaveAt(ts=times)
                 )
@@ -240,12 +234,12 @@ class ODEAgent():
         return avg_rewards
 
     @eqx.filter_jit
-    def get_action(self, obs: jnp.ndarray, key: jax.random.PRNGKey):
+    def get_action(self, ob: jnp.ndarray, key: jax.random.PRNGKey):
         """
         Choose the best action using model-predictive control.
 
         Args:
-            obs: (ob_dim,)
+            ob: (ob_dim,)
         """
         # always start with uniformly random actions
         acs_key, key = jax.random.split(key)
@@ -259,7 +253,7 @@ class ODEAgent():
 
         if self.mpc_strategy == "random":
             # evaluate each action sequence and return the best one
-            rewards = self.evaluate_action_sequences(obs, action_sequences, mpc_discount_arr)
+            rewards = self.evaluate_action_sequences(ob, action_sequences, mpc_discount_arr)
             assert rewards.shape == (self.mpc_num_action_sequences,)
             best_index = jnp.argmax(rewards)
             return action_sequences[best_index, 0, :]
@@ -274,7 +268,7 @@ class ODEAgent():
                 acs_key, key = jax.random.split(key)
                 action_sequences = elite_mean + elite_std * jax.random.normal(key=acs_key, shape=(self.mpc_num_action_sequences, self.mpc_horizon_steps, self.ac_dim))
                 # action_sequences = jnp.clip(action_sequences, self.env.action_space.low, self.env.action_space.high)
-                rewards = self.evaluate_action_sequences(obs, action_sequences, mpc_discount_arr)
+                rewards = self.evaluate_action_sequences(ob, action_sequences, mpc_discount_arr)
                 top_j_idx = jnp.argsort(rewards)[-self.cem_num_elites:]
                 top_j_acs = action_sequences[top_j_idx]
                 elite_mean = (1 - self.cem_alpha) * elite_mean + self.cem_alpha * jnp.mean(top_j_acs, axis=0)

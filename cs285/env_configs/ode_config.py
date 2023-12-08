@@ -4,6 +4,12 @@ import jax
 from typing import Optional, Sequence
 from cs285.envs.dt_sampler import BaseSampler, ConstantSampler, UniformSampler, ExponentialSampler
 
+default_mlp_setup = {
+    "hidden_size": 32,
+    "num_layers": 4,
+    "activation": "relu",
+    "output_activation": "identity",
+}
 
 def ode_config(
     env_name: str,
@@ -11,7 +17,8 @@ def ode_config(
     key: int = 0,
     dt_sampler_name: str = "constant",
     dt_sampler_kwargs: dict={"dt": 0.05},
-    learning_rate: float = 1e-3,
+    optimizer_name: str = "adamw",
+    optimizer_kwargs: dict = {"lr": 1e-3},
     ensemble_size: int = 3,
     mpc_horizon_steps: int = 100,
     mpc_discount: float = 1.0,
@@ -30,10 +37,7 @@ def ode_config(
     replay_buffer_capacity: int = 1000,
     num_agent_train_steps_per_iter: int = 100,
     num_eval_trajectories: int = 10,
-    hidden_size: int = 32,
-    num_layers: int = 4,
-    activation: str = "relu",
-    output_activation: str = "identity",
+    mlp_dynamics_setup: dict = default_mlp_setup,
     train_timestep: float = 0.005,
     train_discount: float = 1.0,
     train_ep_len: int=200,
@@ -63,18 +67,14 @@ def ode_config(
                       "uniform": UniformSampler,
                       "exponential": ExponentialSampler}[mpc_dt_sampler_name](**mpc_dt_sampler_kwargs)
 
-    log_string = f"{env_name}_{exp_name}_hiddensize{hidden_size}_mpc{mpc_strategy}_horizon{mpc_horizon_steps}_actionseq{mpc_num_action_sequences}"
-    if mpc_strategy == "cem":
-        log_string += f"_cem_iters{cem_num_iters}"
+    log_string = f"{env_name}_{exp_name}"
 
     return {
         "agent_kwargs": {
             "key": agent_key,
-            "hidden_size": hidden_size,
-            "num_layers": num_layers,
-            "activation": activation,
-            "output_activation": output_activation,
-            "lr": learning_rate,
+            "mlp_dynamics_setup": mlp_dynamics_setup,
+            "optimizer_name": optimizer_name,
+            "optimizer_kwargs": optimizer_kwargs,
             "ensemble_size": ensemble_size,
             "train_timestep": train_timestep,
             "train_discount": train_discount,
