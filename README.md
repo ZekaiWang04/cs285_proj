@@ -3,7 +3,7 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-##Next TODO##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder)
+##Now Testing##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder), TODO: various RNN + ODE encode, decode, combinations
 
 Be careful of dt
 

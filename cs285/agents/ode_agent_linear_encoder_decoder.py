@@ -22,81 +22,99 @@ _str_to_activation = {
 
 class NeuralODE_Latent_MLP(eqx.Module):
     # runs in latent space
-    # this implementation encodes/decodes obs but not acs
-    # TODO: consider alternatives
+    # this implementation encodes/decodes both obs and acs
     mlp_dynamics: eqx.nn.MLP
-    mlp_encoder: eqx.nn.MLP
-    mlp_decoder: eqx.nn.MLP
+    mlp_ob_encoder: eqx.nn.MLP
+    mlp_ob_decoder: eqx.nn.MLP
+    mlp_ac_encoder: eqx.nn.MLP
 
     def __init__(
             self,
             mlp_dynamics_setup: dict,
-            mlp_encoder_setup: dict,
-            mlp_decoder_setup: dict,
+            mlp_ob_encoder_setup: dict,
+            mlp_ob_decoder_setup: dict,
+            mlp_ac_encoder_setup: dict, # no need for ac decoder
             ob_dim: int,
             ac_dim: int,
-            latent_dim: int,
+            ob_latent_dim: int,
+            ac_latent_dim: int,
             key: jax.random.PRNGKey,
         ):
         # each mlp_..._setup should contain hidden_size: int, num_layers: int, activation: str, output_activation: str
         super().__init__()
-        dynamics_key, encoder_key, decoder_key = jax.random.split(key, 3)
+        dynamics_key, ob_encoder_key, ob_decoder_key, ac_encoder_key = jax.random.split(key, 4)
         self.mlp_dynamics = eqx.nn.MLP(
-            in_size=latent_dim+ac_dim,
-            out_size=latent_dim,
+            in_size=ob_latent_dim+ac_latent_dim,
+            out_size=ob_latent_dim,
             width_size=mlp_dynamics_setup["hidden_size"],
             depth=mlp_dynamics_setup["num_layers"],
             activation=_str_to_activation[mlp_dynamics_setup["activation"]],
             final_activation=_str_to_activation[mlp_dynamics_setup["output_activation"]],
             key=dynamics_key
         )
-        self.mlp_encoder = eqx.nn.MLP(
+        self.mlp_ob_encoder = eqx.nn.MLP(
             in_size=ob_dim,
-            out_size=latent_dim,
-            width_size=mlp_encoder_setup["hidden_size"],
-            depth=mlp_encoder_setup["num_layers"],
-            activation=_str_to_activation[mlp_encoder_setup["activation"]],
-            final_activation=_str_to_activation[mlp_encoder_setup["output_activation"]],
-            key=encoder_key
+            out_size=ob_latent_dim,
+            width_size=mlp_ob_encoder_setup["hidden_size"],
+            depth=mlp_ob_encoder_setup["num_layers"],
+            activation=_str_to_activation[mlp_ob_encoder_setup["activation"]],
+            final_activation=_str_to_activation[mlp_ob_encoder_setup["output_activation"]],
+            key=ob_encoder_key
         )
-        self.mlp_decoder = eqx.nn.MLP(
-            in_size=latent_dim,
+        self.mlp_ob_decoder = eqx.nn.MLP(
+            in_size=ob_latent_dim,
             out_size=ob_dim,
-            width_size=mlp_decoder_setup["hidden_size"],
-            depth=mlp_decoder_setup["num_layers"],
-            activation=_str_to_activation[mlp_decoder_setup["activation"]],
-            final_activation=_str_to_activation[mlp_decoder_setup["output_activation"]],
-            key=decoder_key
+            width_size=mlp_ob_decoder_setup["hidden_size"],
+            depth=mlp_ob_decoder_setup["num_layers"],
+            activation=_str_to_activation[mlp_ob_decoder_setup["activation"]],
+            final_activation=_str_to_activation[mlp_ob_decoder_setup["output_activation"]],
+            key=ob_decoder_key
+        )
+        self.mlp_ac_encoder = eqx.nn.MLP(
+            in_size=ac_dim,
+            out_size=ac_latent_dim,
+            width_size=mlp_ac_encoder_setup["hidden_size"],
+            depth=mlp_ac_encoder_setup["num_layers"],
+            activation=_str_to_activation[mlp_ac_encoder_setup["activation"]],
+            final_activation=_str_to_activation[mlp_ac_encoder_setup["output_activation"]],
+            key=ac_encoder_key
         )
     
     @eqx.filter_jit
-    def encode(self, ob: jnp.ndarray):
+    def ob_encode(self, ob: jnp.ndarray):
         # ob: (ob_dim,)
-        return self.mlp_encoder(ob)
+        return self.mlp_ob_encoder(ob)
 
     @eqx.filter_jit
-    def decode(self, latent: jnp.ndarray):
-        # latent: (latent_dim,)
-        return self.mlp_decoder(latent)
-    
+    def ob_ecode(self, ob_latent: jnp.ndarray):
+        # ob_latent: (ob_latent_dim,)
+        return self.mlp_ob_decoder(ob_latent)
+
     @eqx.filter_jit
-    def batched_decode(self, latents: jnp.ndarray):
-        # latents: (batch_size, latent_dim)
-        return jax.vmap(lambda latent: self.decode(latent))(latents)
+    def ac_encode(self, ac: jnp.ndarray):
+        # ac: (ac_dim,)
+        return self.mlp_ac_encoder(ac)
+
+    @eqx.filter_jit
+    def batched_ob_decode(self, ob_latents: jnp.ndarray):
+        # ob_latents: (batch_size, latent_dim)
+        return jax.vmap(lambda ob_latent: self.ob_decode(ob_latent))(ob_latents)
     
     @eqx.filter_jit
     def __call__(self, t, y, args):
-        # here y has shape (latent_dim,)
+        # here y has shape (ob_latent_dim,)
         times = args["times"] # (ep_len,)
         actions = args["actions"] # (ep_len, ac_dim)
         idx = jnp.searchsorted(times, t, side="right") - 1
         action = actions[idx] # (ac_dim,)
-        return self.mlp((y, action), axis=-1)
+        ac_latent = self.ac_encode(action) # (ac_latent_dim,)
+        return self.mlp((y, ac_latent), axis=-1)
     
 class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
-    # ob --encoder--> z
-    # dz/ dt = NN(latent, ac)
-    # z --decoder--> ob
+    # ob ---ob_encoder---> ob_latent
+    # ac ---ac_encoder---> ac_latent
+    # dob_latent / dt = NN(ob_latent, ac_latent)
+    # ob_latent ---ob_decoder---> ob
     # with encoder, NN, decoder all being MLPs
     # naturally generalizes the Augmented ODE
     def __init__(
@@ -105,8 +123,9 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
         key: jax.random.PRNGKey,
         latent_dim: int,
         mlp_dynamics_setup: dict,
-        mlp_encoder_setup: dict,
-        mlp_decoder_setup: dict,
+        mlp_ob_encoder_setup: dict,
+        mlp_ob_decoder_setup: dict,
+        mlp_ac_encoder_setup: dict,
         optimizer_name: str,
         optimizer_kwargs: dict,
         ensemble_size: int,
@@ -146,8 +165,9 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
         self.ode_functions = [
             NeuralODE_Latent_MLP(
                 mlp_dynamics_setup=mlp_dynamics_setup,
-                mlp_encoder_setup=mlp_encoder_setup,
-                mlp_decoder_setup=mlp_decoder_setup,
+                mlp_ob_encoder_setup=mlp_ob_encoder_setup,
+                mlp_ob_decoder_setup=mlp_ob_decoder_setup,
+                mlp_ac_encoder_setup=mlp_ac_encoder_setup,
                 ob_dim=self.ob_dim,
                 ac_dim=self.ac_dim,
                 latent_dim=latent_dim,

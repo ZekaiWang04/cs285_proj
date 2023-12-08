@@ -6,7 +6,7 @@ from cs285.envs.dt_sampler import BaseSampler
 import equinox as eqx
 import optax
 
-
+#TODO: update interface to match ode_agents
 class ModelBasedAgent():
     _str_to_activation = {
         "relu": jax.nn.relu,
