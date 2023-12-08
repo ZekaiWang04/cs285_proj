@@ -95,8 +95,8 @@ def run_training_loop_ode(
             step_losses = []
             for i in range(mb_agent.ensemble_size):
                 traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"])
-                obs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
-                acs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
+                obs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"] + 1, stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
+                acs = utils.split_arr(np.array(traj["actions"]), length=config["train_ep_len"] + 1, stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
                 batch_size, num_splitted, train_ep_len, ob_dim = obs.shape
                 ac_dim = acs.shape[-1]
                 obs = jnp.array(obs).reshape(batch_size * num_splitted, train_ep_len, ob_dim)
