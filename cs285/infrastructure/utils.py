@@ -181,4 +181,4 @@ def get_traj_length(traj):
 def split_arr(arr: np.ndarray, length: int, stride: int=1):
     # arr (..., ep_len, dims)
     # returns (..., batch_size, length, dims)
-    return sliding_window_view(arr, winow_shape=length, axis=-2).swapaxes(-1,-2)[..., ::stride, :, :]
+    return sliding_window_view(arr, window_shape=length, axis=-2).swapaxes(-1,-2)[..., ::stride, :, :]
