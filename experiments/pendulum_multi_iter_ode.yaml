@@ -21,6 +21,8 @@ hidden_size: 128
 num_layers: 4
 train_timestep: 0.005
 train_discount: 1.0
+train_ep_len: 200
+train_stride: 1
 
 initial_trajs: 100
 trajs: 100

@@ -7,8 +7,6 @@ This is a tracking document for our final project
 
 Be careful of dt
 
-Train with different, manually set "ep_len" wity numpy slideing window view
-
 Jaxify everything and then we can ditch ptu and torch.
 
 Examine why on the notebook training is lightning speed while on the script it takes so long ("solution": use jupyter notebooks to do experiments!!!)
@@ -65,6 +63,10 @@ Have a mpc_dt_sampler and ensemble over different dt distributions
 Get the true dynamics in the ode_agent_true_dynamics.py
 
 Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_\theta (s, a, dt)$ (recall currently the vanilla MPC is $\Delta s = f_\theta (s, a)$, which is agnostic to $dt$). Also we might want to try to incorporate $t$ into $f_\theta(\cdot)$ but I don't believe this will improve performance.
+
+Train with different, manually set "ep_len" wity numpy slideing window view
+
+
 ## Possible References
 
 Latent ODE

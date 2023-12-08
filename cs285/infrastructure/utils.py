@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import copy
 import jax
 from cs285.networks.mlp_policy import MLPPolicy
@@ -176,3 +177,9 @@ def convert_listofrollouts(paths, concat_rew=True):
 
 def get_traj_length(traj):
     return len(traj["reward"])
+
+
+def split_arr(arr: np.ndarray, length: int, stride: int=1):
+    # arr (..., ep_len, dims)
+    # returns (..., batch_size, length, dims)
+    return sliding_window_view(arr, winow_shape=length, axis=-2).swapaxes(-1,-2)[..., ::stride, :, :]

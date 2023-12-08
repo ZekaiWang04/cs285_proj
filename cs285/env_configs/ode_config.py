@@ -34,11 +34,15 @@ def ode_config(
     activation: str = "relu",
     output_activation: str = "identity",
     train_timestep: float = 0.005,
-    train_discount: float = 1.0
+    train_discount: float = 1.0,
+    train_ep_len: int=200,
+    train_stride: int=1
 ):
     # hardcoded for this assignment
     if env_name == "pendulum-cs285-v0":
         ep_len = 200
+    
+    assert train_ep_len <= ep_len
 
     dt_sampler = {"constant": ConstantSampler,
                   "uniform": UniformSampler,
@@ -84,4 +88,6 @@ def ode_config(
         "train_batch_size": train_batch_size,
         "num_agent_train_steps_per_iter": num_agent_train_steps_per_iter,
         "num_eval_trajectories": num_eval_trajectories,
+        "train_ep_len": train_ep_len,
+        "train_stride": train_stride
     }
