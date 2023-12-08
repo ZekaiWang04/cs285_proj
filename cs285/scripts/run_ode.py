@@ -96,16 +96,18 @@ def run_training_loop_ode(
             for i in range(mb_agent.ensemble_size):
                 traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"])
                 obs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
-                acs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
+                acs = utils.split_arr(np.array(traj["actions"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
+                dts = utils.split_arr(np.array(traj["dts"])[..., np.newaxis], length=config["train_ep_len"], stride=config["train_stride"]).squeeze(-1) # (batch_size, num_splitted, train_ep_len)
                 batch_size, num_splitted, train_ep_len, ob_dim = obs.shape
                 ac_dim = acs.shape[-1]
                 obs = jnp.array(obs).reshape(batch_size * num_splitted, train_ep_len, ob_dim)
                 acs = jnp.array(acs).reshape(batch_size * num_splitted, train_ep_len, ac_dim)
+                times = jnp.cumsum(dts, axis=-1).reshape(batch_size * num_splitted, train_ep_len)
                 loss = mb_agent.batched_update(
-                    i=i, 
+                    i=i,
                     obs=obs, 
                     acs=acs, 
-                    times=jnp.cumsum(jnp.array(traj["dts"]), axis=-1)
+                    times=times
                 )
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
