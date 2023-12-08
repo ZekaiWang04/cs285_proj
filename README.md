@@ -69,6 +69,9 @@ Use Baseline that incorporates $\Delta s = f_\theta (s, a) dt$ or $\Delta s = f_
 
 Train with different, manually set "ep_len" wity numpy slideing window view
 
+### Dec 7
+
+GCP works. Training Agent using GCP costs ~220s per iteration.
 
 ## Possible References
 
