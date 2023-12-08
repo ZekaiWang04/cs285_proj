@@ -1,11 +1,10 @@
 from collections import OrderedDict
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import copy
 import jax
-from cs285.networks.mlp_policy import MLPPolicy
 import gym
 import cv2
-from cs285.infrastructure import pytorch_util as ptu
 from typing import Dict, Tuple, List
 
 from tqdm import trange
@@ -23,7 +22,7 @@ class RandomPolicy:
 
 
 def sample_trajectory(
-    env: gym.Env, policy: MLPPolicy, max_length: int, key: jax.random.PRNGKey, render: bool = False,
+    env: gym.Env, policy, max_length: int, key: jax.random.PRNGKey, render: bool = False,
 ) -> Dict[str, np.ndarray]:
     """Sample a rollout in the environment from a policy."""
     ob = env.reset()
@@ -91,7 +90,7 @@ def sample_trajectory(
 
 def sample_trajectories(
     env: gym.Env,
-    policy: MLPPolicy,
+    policy,
     min_timesteps_per_batch: int,
     max_length: int,
     key: jax.random.PRNGKey,
@@ -112,7 +111,7 @@ def sample_trajectories(
 
 
 def sample_n_trajectories(
-    env: gym.Env, policy: MLPPolicy, ntraj: int, max_length: int, key: jax.random.PRNGKey, render: bool = False
+    env: gym.Env, policy, ntraj: int, max_length: int, key: jax.random.PRNGKey, render: bool = False
 ):
     """Collect ntraj rollouts."""
     trajs = []
@@ -177,3 +176,9 @@ def convert_listofrollouts(paths, concat_rew=True):
 
 def get_traj_length(traj):
     return len(traj["reward"])
+
+
+def split_arr(arr: np.ndarray, length: int, stride: int=1):
+    # arr (..., ep_len, dims)
+    # returns (..., batch_size, length, dims)
+    return sliding_window_view(arr, window_shape=length, axis=-2).swapaxes(-1,-2)[..., ::stride, :, :]

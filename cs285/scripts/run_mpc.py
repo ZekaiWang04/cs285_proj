@@ -10,8 +10,8 @@ import time
 
 import gym
 import numpy as np
-import torch
-from cs285.infrastructure import pytorch_util as ptu
+import jax
+import jax.numpy as jnp
 import tqdm
 
 from cs285.infrastructure import utils
@@ -28,8 +28,7 @@ def run_training_loop_mpc(
     assert agent_name == "mpc"
     # set random seeds
     np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    ptu.init_gpu(use_gpu=not args.no_gpu, gpu_id=args.which_gpu)
+    key = jax.random.PRNGKey(args.seed)
 
     # make the gym environment
     env = config["make_env"]()
@@ -62,19 +61,19 @@ def run_training_loop_mpc(
         print(f"\n\n********** Iteration {itr} ************")
         # collect data
         print("Collecting data...")
+        data_key, key = jax.random.split(key)
         if itr == 0:
-            # TODO(student): collect at least config["initial_batch_size"] transitions with a random policy
-            # HINT: Use `utils.RandomPolicy` and `utils.sample_trajectories`
             trajs, envsteps_this_batch = utils.sample_trajectories(env=env, 
                                                                    policy=utils.RandomPolicy(env), 
                                                                    min_timesteps_per_batch=config["initial_batch_size"],
-                                                                   max_length=ep_len)
+                                                                   max_length=ep_len,
+                                                                   key=data_key)
         else:
-            # TODO(student): collect at least config["batch_size"] transitions with our `actor_agent`
             trajs, envsteps_this_batch = utils.sample_trajectories(env=env, 
                                                                    policy=actor_agent, 
                                                                    min_timesteps_per_batch=config["batch_size"],
-                                                                   max_length=ep_len)
+                                                                   max_length=ep_len,
+                                                                   key=data_key)
 
         total_envsteps += envsteps_this_batch
         logger.log_scalar(total_envsteps, "total_envsteps", itr)
@@ -104,12 +103,9 @@ def run_training_loop_mpc(
             config["num_agent_train_steps_per_iter"], dynamic_ncols=True
         ):
             step_losses = []
-            # TODO(student): train the dynamics models
-            # HINT: train each dynamics model in the ensemble with a *different* batch of transitions!
-            # Use `replay_buffer.sample` with config["train_batch_size"].
             for i in range(mb_agent.ensemble_size):
                 batch = replay_buffer.sample(config["train_batch_size"])
-                loss = mb_agent.update(i, batch["observations"], batch["actions"], batch["next_observations"], batch["dts"])
+                loss = mb_agent.batched_update(i, batch["observations"], batch["actions"], batch["next_observations"], batch["dts"])
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
 
@@ -129,10 +125,12 @@ def run_training_loop_mpc(
         if config["num_eval_trajectories"] == 0:
             continue
         print(f"Evaluating {config['num_eval_trajectories']} rollouts...")
+        sample_key, key = jax.random.split(key)
         trajs, _ = utils.sample_n_trajectories(
             eval_env,
             policy=actor_agent,
             ntraj=config["num_eval_trajectories"],
+            key=sample_key,
             max_length=ep_len,
         )
         returns = [t["episode_statistics"]["r"] for t in trajs]
@@ -151,11 +149,13 @@ def run_training_loop_mpc(
             logger.log_scalar(np.min(ep_lens), "eval/ep_len_min", itr)
 
             if args.num_render_trajectories > 0:
+                data_key, key = jax.random.split(key)
                 video_trajectories = utils.sample_n_trajectories(
-                    render_env,
-                    actor_agent,
-                    args.num_render_trajectories,
-                    ep_len,
+                    env=render_env,
+                    policy=actor_agent,
+                    ntraj=args.num_render_trajectories,
+                    max_length=ep_len,
+                    key=data_key,
                     render=True,
                 )
 

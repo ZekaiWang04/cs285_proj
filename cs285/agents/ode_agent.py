@@ -1,15 +1,13 @@
-from typing import Callable, Optional, Tuple, Sequence
+from typing import Optional
 import numpy as np
 import gym
-from cs285.infrastructure import pytorch_util as ptu
-from torchdiffeq import odeint
-from tqdm import trange
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
 from diffrax import diffeqsolve, Dopri5
 import optax
+from cs285.envs.dt_sampler import BaseSampler
 
 class NeuralODE(eqx.Module):
     _str_to_activation = {
@@ -61,20 +59,21 @@ class ODEAgent():
         key: jax.random.PRNGKey,
         hidden_size: int,
         num_layers: int,
+        activation: str,
+        output_activation: str,
+        lr: float,
         ensemble_size: int,
         train_timestep: float,
         train_discount: float,
         mpc_horizon_steps: int,
         mpc_discount: float,
-        mpc_timestep: float,
         mpc_strategy: str,
         mpc_num_action_sequences: int,
+        mpc_dt_sampler: BaseSampler,
+        mpc_timestep: float,
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
-        activation: str = "relu",
-        output_activation: str = "identity",
-        lr: float=0.001
     ):
         # super().__init__()
         self.env = env
@@ -85,11 +84,12 @@ class ODEAgent():
         assert 0 < mpc_discount <= 1
         self.mpc_discount = mpc_discount
         self.mpc_strategy = mpc_strategy
+        self.mpc_timestep = mpc_timestep
         self.mpc_num_action_sequences = mpc_num_action_sequences
         self.cem_num_iters = cem_num_iters
         self.cem_num_elites = cem_num_elites
         self.cem_alpha = cem_alpha
-        self.mpc_timestep = mpc_timestep # when evaluating
+        self.mpc_dt_sampler = mpc_dt_sampler # when evaluating
 
         assert mpc_strategy in (
             "random",
@@ -214,7 +214,8 @@ class ODEAgent():
 
     @eqx.filter_jit
     def evaluate_action_sequences(self, obs: jnp.ndarray, acs: jnp.ndarray, mpc_discount_arr: jnp.ndarray):
-        times = jnp.linspace(0, (self.mpc_horizon_steps - 1) * self.mpc_timestep, self.mpc_horizon_steps)
+        dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps,))
+        times = jnp.cumsum(dts) # (self.mpc_horizon_steps, )
 
         def evaluate_single_sequence(ac):
             avg_rewards = jnp.zeros((self.ensemble_size,))

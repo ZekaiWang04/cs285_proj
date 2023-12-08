@@ -13,8 +13,6 @@ import gym
 import jax
 import jax.numpy as jnp
 import numpy as np
-import torch
-from cs285.infrastructure import pytorch_util as ptu
 import tqdm
 
 from cs285.infrastructure import utils
@@ -29,9 +27,7 @@ def run_training_loop_ode(
     assert agent_name == "ode"
     # set random seeds
     np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
-    ptu.init_gpu(use_gpu=not args.no_gpu, gpu_id=args.which_gpu)
 
     # make the gym environment
     env = config["make_env"]()
@@ -99,11 +95,19 @@ def run_training_loop_ode(
             step_losses = []
             for i in range(mb_agent.ensemble_size):
                 traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"])
+                obs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
+                acs = utils.split_arr(np.array(traj["actions"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
+                dts = utils.split_arr(np.array(traj["dts"])[..., np.newaxis], length=config["train_ep_len"], stride=config["train_stride"]).squeeze(-1) # (batch_size, num_splitted, train_ep_len)
+                batch_size, num_splitted, train_ep_len, ob_dim = obs.shape
+                ac_dim = acs.shape[-1]
+                obs = jnp.array(obs).reshape(batch_size * num_splitted, train_ep_len, ob_dim)
+                acs = jnp.array(acs).reshape(batch_size * num_splitted, train_ep_len, ac_dim)
+                times = jnp.cumsum(dts, axis=-1).reshape(batch_size * num_splitted, train_ep_len)
                 loss = mb_agent.batched_update(
-                    i=i, 
-                    obs=jnp.array(traj["observations"]), 
-                    acs=jnp.array(traj["actions"]), 
-                    times=jnp.cumsum(jnp.array(traj["dts"]), axis=-1)
+                    i=i,
+                    obs=obs, 
+                    acs=acs, 
+                    times=times
                 )
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
@@ -151,11 +155,13 @@ def run_training_loop_ode(
             logger.log_scalar(np.min(ep_lens), "eval/ep_len_min", itr)
 
             if args.num_render_trajectories > 0:
+                data_key, key = jax.random.split(key)
                 video_trajectories = utils.sample_n_trajectories(
-                    render_env,
-                    actor_agent,
-                    args.num_render_trajectories,
-                    ep_len,
+                    env=render_env,
+                    policy=actor_agent,
+                    ntraj=args.num_render_trajectories,
+                    max_length=ep_len,
+                    key=data_key,
                     render=True,
                 )
 
