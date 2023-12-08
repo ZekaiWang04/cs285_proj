@@ -4,8 +4,7 @@ exp_name: pendulum_multi_ode
 base_config: ode
 
 dt_sampler_name: constant
-dt_sampler_kwargs:
-  dt: 0.05
+dt_sampler_kwargs: {dt: 0.05}
 learning_rate: 0.001
 ensemble_size: 10
 mpc_horizon_steps: 20
