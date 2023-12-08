@@ -62,7 +62,7 @@ class ModelBasedAgent():
         self.ob_dim = env.observation_space.shape[0]
         self.ac_dim = env.action_space.shape[0]
         activation = self._str_to_activation[activation]
-        final_activation = self._str_to_activation[final_activation]
+        output_activation = self._str_to_activation[output_activation]
 
         self.ensemble_size = ensemble_size
         keys = jax.random.split(key, ensemble_size)
@@ -74,7 +74,7 @@ class ModelBasedAgent():
                     width_size=hidden_size,
                     depth=num_layers,
                     activation=activation,
-                    final_activation=final_activation,
+                    final_activation=output_activation,
                     key=keys[n]
                 )
                 for n in range(ensemble_size)
@@ -87,7 +87,7 @@ class ModelBasedAgent():
                     width_size=hidden_size,
                     depth=num_layers,
                     activation=activation,
-                    final_activation=final_activation,
+                    final_activation=output_activation,
                     key=keys[n]
                 )
                 for n in range(ensemble_size)
@@ -100,7 +100,7 @@ class ModelBasedAgent():
                     width_size=hidden_size,
                     depth=num_layers,
                     activation=activation,
-                    final_activation=final_activation,
+                    final_activation=output_activation,
                     key=keys[n]
                 )
                 for n in range(ensemble_size)

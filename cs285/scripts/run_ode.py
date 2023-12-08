@@ -153,11 +153,13 @@ def run_training_loop_ode(
             logger.log_scalar(np.min(ep_lens), "eval/ep_len_min", itr)
 
             if args.num_render_trajectories > 0:
+                data_key, key = jax.random.split(key)
                 video_trajectories = utils.sample_n_trajectories(
-                    render_env,
-                    actor_agent,
-                    args.num_render_trajectories,
-                    ep_len,
+                    env=render_env,
+                    policy=actor_agent,
+                    ntraj=args.num_render_trajectories,
+                    max_length=ep_len,
+                    key=data_key,
                     render=True,
                 )
 

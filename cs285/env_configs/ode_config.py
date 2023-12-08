@@ -1,4 +1,3 @@
-from cs285.infrastructure import pytorch_util as ptu
 from gym.wrappers.record_episode_statistics import RecordEpisodeStatistics
 import gym
 import jax

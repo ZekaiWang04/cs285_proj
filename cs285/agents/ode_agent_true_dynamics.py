@@ -3,7 +3,6 @@ import gym
 from typing import Optional, Callable
 from cs285.agents.ode_agent import ODEAgent
 from cs285.envs.dt_sampler import BaseSampler
-from torchdiffeq import odeint
 from tqdm import trange
 import jax
 import jax.numpy as jnp
