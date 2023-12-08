@@ -1,7 +1,9 @@
 env_name: pendulum-cs285-v0
-exp_name: pendulum_multi_ode
+exp_name: pendulum_ode
 
 base_config: ode
+
+key: 27
 
 dt_sampler_name: constant
 dt_sampler_kwargs:
@@ -11,16 +13,19 @@ ensemble_size: 10
 mpc_horizon_steps: 20
 mpc_discount: 1.0
 mpc_strategy: random
-mpc_num_action_sequences: 1000
+mpc_num_action_sequences: 100
 mpc_dt_sampler_name: constant
 mpc_dt_sampler_kwargs:
   dt: 0.05
+mpc_timestep: 0.05
 cem_num_iters: 5
 cem_num_elites: 10
 cem_alpha: 1
 
 hidden_size: 128
 num_layers: 4
+activation: relu
+output_activation: identity
 train_timestep: 0.005
 train_discount: 1.0
 train_ep_len: 200

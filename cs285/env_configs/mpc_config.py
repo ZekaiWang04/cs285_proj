@@ -9,7 +9,7 @@ import jax.numpy as jnp
 def mpc_config(
     env_name: str,
     exp_name: str,
-    key: jax.random.PRNGKey = jax.random.PRNGKey(0),
+    key: int = 0,
     dt_sampler_name: str = "constant",
     dt_sampler_kwargs: dict={"dt": 0.05},
     learning_rate: float = 1e-3,
@@ -35,6 +35,7 @@ def mpc_config(
     output_activation: str = "identity",
     mode: str = "vanilla"
 ):
+    key = jax.random.PRNGKey(key)
     # hardcoded for this assignment
     if env_name == "pendulum-cs285-v0":
         ep_len = 200
@@ -62,6 +63,9 @@ def mpc_config(
             "key": key,
             "hidden_size": hidden_size,
             "num_layers": num_layers,
+            "activation": activation,
+            "output_activation": output_activation,
+            "lr": learning_rate,
             "ensemble_size": ensemble_size,
             "mpc_horizon_steps": mpc_horizon_steps,
             "mpc_discount": mpc_discount,
@@ -71,10 +75,7 @@ def mpc_config(
             "cem_num_iters": cem_num_iters,
             "cem_num_elites": cem_num_elites,
             "cem_alpha": cem_alpha,
-            "activation": activation,
-            "output_activation": output_activation,
-            "lr": learning_rate,
-            "mode": mode
+            "mode": mode,
         },
         "make_env": make_env,
         "replay_buffer_capacity": replay_buffer_capacity,

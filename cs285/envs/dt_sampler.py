@@ -9,7 +9,7 @@ class BaseSampler():
         pass
 
 class ConstantSampler(BaseSampler):
-    def __init__(self, dt: float, key: jax.random.PRNGKey):
+    def __init__(self, dt: float, key: jax.random.PRNGKey=None):
         super().__init__()
         self.dt = dt
 

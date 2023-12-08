@@ -70,6 +70,7 @@ class ODEAgent():
         mpc_strategy: str,
         mpc_num_action_sequences: int,
         mpc_dt_sampler: BaseSampler,
+        mpc_timestep: float,
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
@@ -83,6 +84,7 @@ class ODEAgent():
         assert 0 < mpc_discount <= 1
         self.mpc_discount = mpc_discount
         self.mpc_strategy = mpc_strategy
+        self.mpc_timestep = mpc_timestep
         self.mpc_num_action_sequences = mpc_num_action_sequences
         self.cem_num_iters = cem_num_iters
         self.cem_num_elites = cem_num_elites

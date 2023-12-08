@@ -109,7 +109,7 @@ class ModelBasedAgent():
             raise Exception
         
         self.optims = [optax.adamw(lr) for _ in range(ensemble_size)]
-        self.optim_states = [self.optims[n].init(eqx.filter(self.ode_functions[n], eqx.is_array)) for n in range(self.ensemble_size)]
+        self.optim_states = [self.optims[n].init(eqx.filter(self.dynamics_models[n], eqx.is_array)) for n in range(self.ensemble_size)]
         
         self.obs_acs_mean = jnp.zeros(self.ob_dim + self.ac_dim)
         self.obs_acs_std = jnp.ones(self.ob_dim + self.ac_dim)
@@ -131,7 +131,7 @@ class ModelBasedAgent():
         dts = dts[..., jnp.newaxis]
         obs_delta = next_obs - obs
         obs_delta_normalized = (obs_delta - self.obs_delta_mean) / (self.obs_delta_std + self.eps)
-        obs_acs = jnp.concatenate((obs, acs), dim=1)
+        obs_acs = jnp.concatenate((obs, acs), axis=1)
         obs_acs_normalized = (obs_acs - self.obs_acs_mean) / (self.obs_acs_std + self.eps)
         obs_acs_normalized_dts = jnp.concatenate((obs_acs_normalized, dts), axis=1)
         model, optim, opt_state = self.dynamics_models[i], self.optims[i], self.optim_states[i]
@@ -149,7 +149,7 @@ class ModelBasedAgent():
                     ob_delta_predicted = ob_ac_normalized_dts[-1] * model(ob_ac_normalized_dts[:-1])
                 else:
                     raise Exception
-                return jnp.sum((ob_delta_predicted, ob_delta_normalized) ** 2)
+                return jnp.sum((ob_delta_predicted - ob_delta_normalized) ** 2)
             losses = jax.vmap(get_single_loss, (0, 0), 0)(obs_acs_normalized_dts, obs_delta_normalized)
             return jnp.mean(losses)
 
@@ -168,12 +168,12 @@ class ModelBasedAgent():
             acs: (n, ac_dim)
             next_obs: (n, ob_dim)
         """
-        obs_acs = jnp.concatenate((obs, acs), dim=1)
+        obs_acs = jnp.concatenate((obs, acs), axis=1)
         obs_delta = next_obs - obs
-        self.obs_acs_mean = jnp.mean(obs_acs, dim=0)
-        self.obs_acs_std = jnp.std(obs_acs, dim=0)
-        self.obs_delta_mean = jnp.mean(obs_delta, dim=0)
-        self.obs_delta_std = jnp.std(obs_delta, dim=0)
+        self.obs_acs_mean = jnp.mean(obs_acs, axis=0)
+        self.obs_acs_std = jnp.std(obs_acs, axis=0)
+        self.obs_delta_mean = jnp.mean(obs_delta, axis=0)
+        self.obs_delta_std = jnp.std(obs_delta, axis=0)
 
 
     @eqx.filter_jit
@@ -191,7 +191,7 @@ class ModelBasedAgent():
         Returns: (batch_size, ob_dim)
         """
         dts = dts[..., jnp.newaxis]
-        obs_acs = jnp.concatenate((obs, acs), dim=1)
+        obs_acs = jnp.concatenate((obs, acs), axis=1)
         obs_acs_normalized = (obs_acs - self.obs_acs_mean) / (self.obs_acs_std + self.eps)
         obs_acs_normalized_dts = jnp.concatenate((obs_acs_normalized, dts), axis=1)
         model = self.dynamics_models[i]
@@ -206,12 +206,13 @@ class ModelBasedAgent():
                 ob_delta_predicted = ob_ac_normalized_dts[-1] * model(ob_ac_normalized_dts[:-1])
             else:
                 raise Exception
+            return ob_delta_predicted
         obs_delta_normalized = jax.vmap(forward, 0, 0)(obs_acs_normalized_dts)
         obs_delta = obs_delta_normalized * (self.obs_delta_std + self.eps) + self.obs_delta_mean
         pred_next_obs = obs + obs_delta
         return pred_next_obs
 
-    @eqx.filter_jit
+    # @eqx.filter_jit # [Compiling module jit_evaluate_action_sequences] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.]
     def evaluate_action_sequences(self, obs: jnp.ndarray, action_sequences: jnp.ndarray):
         """
         Evaluate a batch of action sequences using the ensemble of dynamics models.
@@ -222,7 +223,7 @@ class ModelBasedAgent():
         Returns:
             sum_of_rewards: shape (mpc_num_action_sequences,)
         """
-        dts = self.mpc_discount.get_dt(size=(self.mpc_horizon_steps,))
+        dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps,))
         sum_of_rewards = jnp.zeros((self.ensemble_size, self.mpc_num_action_sequences))
         # We need to repeat our starting obs for each of the rollouts.
         obs = jnp.tile(obs, (self.ensemble_size, self.mpc_num_action_sequences, 1))
@@ -258,7 +259,7 @@ class ModelBasedAgent():
         # now we average over the ensemble dimension
         return sum_of_rewards.mean(axis=0)
 
-    @eqx.filter_jit
+    # @eqx.filter_jit # [Compiling module jit_get_action] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
     def get_action(self, obs: jnp.ndarray, key=None):
         """
         Choose the best action using model-predictive control.
