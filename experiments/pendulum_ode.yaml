@@ -10,7 +10,7 @@ dt_sampler_kwargs:
   dt: 0.05
 optimizer_name: adamw
 optimizer_kwargs:
-  lr: 0.001
+  learning_rate: 0.001
 ensemble_size: 10
 mpc_horizon_steps: 20
 mpc_discount: 0.95
