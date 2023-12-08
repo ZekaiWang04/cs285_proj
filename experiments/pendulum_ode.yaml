@@ -11,9 +11,9 @@ dt_sampler_kwargs:
 learning_rate: 0.001
 ensemble_size: 10
 mpc_horizon_steps: 20
-mpc_discount: 1.0
+mpc_discount: 0.95
 mpc_strategy: random
-mpc_num_action_sequences: 100
+mpc_num_action_sequences: 500
 mpc_dt_sampler_name: constant
 mpc_dt_sampler_kwargs:
   dt: 0.05
