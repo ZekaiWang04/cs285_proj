@@ -63,6 +63,29 @@ class ODEAgent_Augmented(ODEAgent_Vanilla):
     # replace d[ob]/dt = NN(ob, ac) with d[ob, aug]/dt = NN([ob, aug], ac)
     # directly decodes ob from [ob, aug]
     # can choose to learn initial aug value or set it to 0s
+
+    env: gym.Env
+    train_timestep: float
+    train_discount: float
+    mpc_horizon_steps: int
+    mpc_discount: float
+    mpc_strategy: str
+    mpc_num_action_sequences: int
+    mpc_dt_sampler: BaseSampler
+    mpc_timestep: float
+    cem_num_iters: int
+    cem_num_elites: int
+    cem_alpha: float
+    ac_dim: int
+    ob_dim: int
+    ensemble_size: int
+    ode_functions: list
+    optims: list
+    optim_states: list
+    solver: Dopri5
+    aug_dim: int
+
+
     def __init__(
         self,
         env: gym.Env,

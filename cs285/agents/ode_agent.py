@@ -47,7 +47,27 @@ class NeuralODE_Vanilla(eqx.Module):
         # althoug I believe this should also work for batched
         return self.mlp(jnp.concatenate((y, action), axis=-1))
     
-class ODEAgent_Vanilla():
+class ODEAgent_Vanilla(eqx.Module):
+    env: gym.Env
+    train_timestep: float
+    train_discount: float
+    mpc_horizon_steps: int
+    mpc_discount: float
+    mpc_strategy: str
+    mpc_num_action_sequences: int
+    mpc_dt_sampler: BaseSampler
+    mpc_timestep: float
+    cem_num_iters: int
+    cem_num_elites: int
+    cem_alpha: float
+    ac_dim: int
+    ob_dim: int
+    ensemble_size: int
+    ode_functions: list
+    optims: list
+    optim_states: list
+    solver: Dopri5
+
     def __init__(
         self,
         env: gym.Env,
@@ -68,7 +88,6 @@ class ODEAgent_Vanilla():
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
     ):
-        # super().__init__()
         self.env = env
         self.train_timestep = train_timestep
         assert 0 < train_discount <= 1
@@ -276,3 +295,18 @@ class ODEAgent_Vanilla():
             return jnp.clip(elite_mean[0], self.env.action_space.low, self.env.action_space.high)
         else:
             raise ValueError(f"Invalid MPC strategy '{self.mpc_strategy}'")
+
+    def save(self, path):
+        tree_weights, tree_other = eqx.partition(self, eqx.is_inexact_array)
+        with open(path, "wb") as f:
+            for x in jax.tree_util.tree_leaves(tree_weights):
+                jnp.save(f, x, allow_pickle=False)
+
+    def load(self, path):
+        # note: self must already have been initialized with the same agrugments
+        tree_weights, tree_other = eqx.partition(self, eqx.is_inexact_array)
+        leaves_orig, treedef = jax.tree_util.tree_flatten(tree_weights)
+        with open(path, "rb") as f:
+            flat_state = [jnp.asarray(jnp.load(f)) for _ in leaves_orig]
+        tree_weights = jax.tree_util.tree_unflatten(treedef, flat_state)
+        self = eqx.combine(tree_weights, tree_other)

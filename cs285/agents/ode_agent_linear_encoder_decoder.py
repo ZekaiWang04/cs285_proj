@@ -117,11 +117,35 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
     # ob_latent ---ob_decoder---> ob
     # with encoder, NN, decoder all being MLPs
     # naturally generalizes the Augmented ODE
+
+    env: gym.Env
+    train_timestep: float
+    train_discount: float
+    mpc_horizon_steps: int
+    mpc_discount: float
+    mpc_strategy: str
+    mpc_num_action_sequences: int
+    mpc_dt_sampler: BaseSampler
+    mpc_timestep: float
+    cem_num_iters: int
+    cem_num_elites: int
+    cem_alpha: float
+    ac_dim: int
+    ob_dim: int
+    ensemble_size: int
+    ode_functions: list
+    optims: list
+    optim_states: list
+    solver: Dopri5
+    ob_latent_dim: int
+    ac_latent_dim: int
+
     def __init__(
         self,
         env: gym.Env,
         key: jax.random.PRNGKey,
-        latent_dim: int,
+        ob_latent_dim: int,
+        ac_latent_dim: int,
         mlp_dynamics_setup: dict,
         mlp_ob_encoder_setup: dict,
         mlp_ob_decoder_setup: dict,
@@ -160,7 +184,8 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
             cem_num_elites=cem_num_elites,
             cem_alpha=cem_alpha,
         )
-        self.latent_dim = latent_dim
+        self.ob_latent_dim = ob_latent_dim
+        self.ac_latent_dim = ac_latent_dim
         keys = jax.random.split(key, ensemble_size)
         self.ode_functions = [
             NeuralODE_Latent_MLP(
