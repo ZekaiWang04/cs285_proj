@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
-from diffrax import diffeqsolve
+from diffrax import diffeqsolve, Dopri5, PIDController
 import optax
 from cs285.envs.dt_sampler import BaseSampler
 from cs285.agents.ode_agent import ODEAgent_Vanilla
@@ -195,7 +195,8 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
                 mlp_ac_encoder_setup=mlp_ac_encoder_setup,
                 ob_dim=self.ob_dim,
                 ac_dim=self.ac_dim,
-                latent_dim=latent_dim,
+                ob_latent_dim=ob_latent_dim,
+                ac_latent_dim=ac_latent_dim,
                 key=keys[n]
             ) for n in range(ensemble_size)
         ]
@@ -228,6 +229,7 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
                     dt0=self.train_timestep,
                     y0=z,
                     args={"times": time, "actions": ac},
+                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                     saveat=diffrax.SaveAt(ts=time)
                 )
                 assert sol.ys.shape == (ep_len, self.latent_dim)
@@ -263,6 +265,7 @@ class ODEAgent_Latent_MLP(ODEAgent_Vanilla):
                     dt0=self.mpc_timestep,
                     y0=ode_func.encode(ob),
                     args={"times": times, "actions": ac},
+                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                     saveat=diffrax.SaveAt(ts=times)
                 )
                 rewards, _ = self.env.get_reward_jnp(ode_func.batched_decode(ode_out.ys), ac)

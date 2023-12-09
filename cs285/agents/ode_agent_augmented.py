@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
-from diffrax import diffeqsolve
+from diffrax import diffeqsolve, Dopri5, PIDController
 import optax
 from cs285.envs.dt_sampler import BaseSampler
 from cs285.agents.ode_agent import ODEAgent_Vanilla
@@ -167,6 +167,7 @@ class ODEAgent_Augmented(ODEAgent_Vanilla):
                     dt0=self.train_timestep,
                     y0=jnp.concatenate((ob[0], ode_func.get_aug_init())),
                     args={"times": time, "actions": ac},
+                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                     saveat=diffrax.SaveAt(ts=time)
                 )
                 assert sol.ys.shape == (ep_len, self.ob_dim + self.aug_dim)
@@ -200,6 +201,7 @@ class ODEAgent_Augmented(ODEAgent_Vanilla):
                     dt0=self.mpc_timestep,
                     y0=jnp.concatenate((ob, ode_func.get_aug_init())),
                     args={"times": times, "actions": ac},
+                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                     saveat=diffrax.SaveAt(ts=times)
                 )
                 rewards, _ = self.env.get_reward_jnp(ode_out.ys[:, :self.ob_dim], ac)
