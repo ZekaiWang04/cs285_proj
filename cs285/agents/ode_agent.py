@@ -47,7 +47,7 @@ class NeuralODE_Vanilla(eqx.Module):
         # althoug I believe this should also work for batched
         return self.mlp(jnp.concatenate((y, action), axis=-1))
     
-class ODEAgent_Vanilla():
+class ODEAgent():
     def __init__(
         self,
         env: gym.Env,
