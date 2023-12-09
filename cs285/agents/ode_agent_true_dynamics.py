@@ -1,9 +1,7 @@
-import numpy as np
 import gym
 from typing import Optional, Callable
-from cs285.agents.ode_agent import ODEAgent
+from cs285.agents.ode_agent import ODEAgent_Vanilla
 from cs285.envs.dt_sampler import BaseSampler
-from tqdm import trange
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -29,12 +27,12 @@ def pendulum_true_dynamics(t, y, args):
     l = 1.0
     u = jnp.clip(action, -max_torque, max_torque)[0]
     newthdot = thdot + (3 * g / (2 * l) * sin_theta + 3.0 / (m * l**2) * u) * (times[idx+1] - times[idx])
-    newthdot = np.clip(newthdot, -max_speed, max_speed)
+    newthdot = jnp.clip(newthdot, -max_speed, max_speed)
     newth = th + newthdot * (times[idx+1] - times[idx])
     return jnp.asarray([-jnp.sin(newth) * newthdot, jnp.cos(newth) * newthdot, 3 * g / (2 * l) * sin_theta + 3.0 / (m * l**2) * u])
 
 
-class ODEAgent_True_Dynamics(ODEAgent):
+class ODEAgent_True_Dynamics(ODEAgent_Vanilla):
     env: gym.Env
     train_timestep: float
     train_discount: float

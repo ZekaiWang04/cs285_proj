@@ -1,5 +1,4 @@
 from typing import Optional
-import numpy as np
 import gym
 import jax
 import jax.numpy as jnp
@@ -284,8 +283,8 @@ class ODEAgent_Vanilla(eqx.Module):
             elite_mean, elite_std = None, None
             for i in range(self.cem_num_iters):
                 if i == 0:
-                    elite_mean = np.mean(action_sequences, axis=0)
-                    elite_std = np.std(action_sequences, axis=0)
+                    elite_mean = jnp.mean(action_sequences, axis=0)
+                    elite_std = jnp.std(action_sequences, axis=0)
                 assert elite_mean.shape == (self.mpc_horizon_steps, self.ac_dim)
                 assert elite_std.shape == (self.mpc_horizon_steps, self.ac_dim)
                 acs_key, key = jax.random.split(key)

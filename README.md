@@ -3,9 +3,11 @@ This is a tracking document for our final project
 
 ## TODOs
 ### Implementation
-##Now Testing##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder), TODO: various RNN + ODE encode, decode, combinations
+##Now Testing##Change ODE structure, for example try latent ode, possibly incorporating action (see the attached paper for two latent ode based approaches: ODE-RNN and VAE-based, also try vanilla MLP encoder-decoder), TODO: various RNN + ODE encode, decode, combinations (more specifically, RNN-VAE (maybe no), Latent ODE, ODE RNN from https://arxiv.org/pdf/1907.03907.pdf)
 
 Be careful of dt
+
+eqx.filter_array or eqx.filter_array_like for initing optax optimizers
 
 After setting timestep_controller in diffeqsolve, training speed increased dramatically, so it might be that the PIDController makes solver less accurate?
 

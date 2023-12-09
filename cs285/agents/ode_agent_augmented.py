@@ -1,5 +1,4 @@
 from typing import Optional
-import numpy as np
 import gym
 import jax
 import jax.numpy as jnp
@@ -152,9 +151,10 @@ class ODEAgent_Augmented(ODEAgent_Vanilla):
         discount_array = self.train_discount ** jnp.arange(ep_len)[..., jnp.newaxis]
         ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
 
-        @eqx.filter_jit
+        # @eqx.filter_jit # takes too long to compile
         @eqx.filter_value_and_grad
         def get_batchified_loss(ode_func, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
+            @eqx.filter_jit
             def get_single_loss(ob: jnp.ndarray, ac: jnp.ndarray, time: jnp.ndarray):
                 assert ob.shape == (ep_len, self.ob_dim)
                 assert ac.shape == (ep_len, self.ac_dim)
