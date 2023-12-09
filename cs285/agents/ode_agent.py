@@ -295,18 +295,3 @@ class ODEAgent_Vanilla(eqx.Module):
             return jnp.clip(elite_mean[0], self.env.action_space.low, self.env.action_space.high)
         else:
             raise ValueError(f"Invalid MPC strategy '{self.mpc_strategy}'")
-
-    def save(self, path):
-        tree_weights, tree_other = eqx.partition(self, eqx.is_inexact_array)
-        with open(path, "wb") as f:
-            for x in jax.tree_util.tree_leaves(tree_weights):
-                jnp.save(f, x, allow_pickle=False)
-
-    def load(self, path):
-        # note: self must already have been initialized with the same agrugments
-        tree_weights, tree_other = eqx.partition(self, eqx.is_inexact_array)
-        leaves_orig, treedef = jax.tree_util.tree_flatten(tree_weights)
-        with open(path, "rb") as f:
-            flat_state = [jnp.asarray(jnp.load(f)) for _ in leaves_orig]
-        tree_weights = jax.tree_util.tree_unflatten(treedef, flat_state)
-        self = eqx.combine(tree_weights, tree_other)
