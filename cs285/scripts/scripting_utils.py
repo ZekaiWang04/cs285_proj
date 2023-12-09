@@ -26,4 +26,4 @@ def make_logger(config: dict) -> Logger:
     if not (os.path.exists(logdir)):
         os.makedirs(logdir)
 
-    return Logger(logdir)
+    return Logger(logdir), logdir

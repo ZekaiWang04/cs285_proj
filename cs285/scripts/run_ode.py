@@ -2,8 +2,8 @@ import os
 import time
 from typing import Optional
 from matplotlib import pyplot as plt
-
-from cs285.agents.ode_agent import ODEAgent
+from cs285.agents.utils import save_leaves, load_leaves
+from cs285.agents.ode_agent import ODEAgent_Vanilla
 from cs285.infrastructure.replay_buffer import ReplayBufferTrajectories
 
 import os
@@ -22,8 +22,9 @@ import argparse
 
 
 def run_training_loop_ode(
-    config: dict, agent_name: str, logger: Logger, args: argparse.Namespace
+    config: dict, agent_name: str, logger: Logger, args: argparse.Namespace, log_dir: str
 ):
+    checkpoint_dir= os.path.join(log_dir, "checkpoint")
     assert agent_name == "ode"
     # set random seeds
     np.random.seed(args.seed)
@@ -50,7 +51,7 @@ def run_training_loop_ode(
         fps = 2
 
     # initialize agent
-    mb_agent = ODEAgent(env, **config["agent_kwargs"])
+    mb_agent = ODEAgent_Vanilla(env, **config["agent_kwargs"])
     replay_buffer = ReplayBufferTrajectories(seed=args.seed, capacity=config["replay_buffer_capacity"])
     actor_agent = mb_agent
 
@@ -111,6 +112,9 @@ def run_training_loop_ode(
                 )
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
+
+        # save the current model
+        save_leaves(mb_agent, checkpoint_dir)
 
         """
         # this block will cause some weird error

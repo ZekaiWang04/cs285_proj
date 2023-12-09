@@ -25,12 +25,12 @@ def main():
     args = parser.parse_args()
 
     config, agent_name = make_config(args.config_file)
-    logger = make_logger(config)
+    logger, log_dir = make_logger(config)
 
     if agent_name == "mpc":
-        run_training_loop_mpc(config, agent_name, logger, args)
+        run_training_loop_mpc(config, agent_name, logger, args, log_dir)
     elif agent_name == "ode":
-        run_training_loop_ode(config, agent_name, logger, args)
+        run_training_loop_ode(config, agent_name, logger, args, log_dir)
     else:
         raise Exception
 

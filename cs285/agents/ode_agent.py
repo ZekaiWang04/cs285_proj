@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
-from diffrax import diffeqsolve, Dopri5
+from diffrax import diffeqsolve, Dopri5, PIDController
 import optax
 from cs285.envs.dt_sampler import BaseSampler
 
@@ -161,13 +161,14 @@ class ODEAgent_Vanilla(eqx.Module):
         @eqx.filter_value_and_grad
         def loss_grad(ode_func):
             sol = diffeqsolve(
-                diffrax.ODETerm(ode_func), 
-                self.solver, 
+                terms=diffrax.ODETerm(ode_func),
+                solver=self.solver, 
                 t0=times[0], 
                 t1=times[-1],
                 dt0=self.train_timestep,
                 y0 = obs[0, :],
                 args={"times": times, "actions": acs},
+                stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                 saveat=diffrax.SaveAt(ts=times)
             )
             assert sol.ys.shape == obs.shape == (ep_len, self.ob_dim)
@@ -194,9 +195,10 @@ class ODEAgent_Vanilla(eqx.Module):
         discount_array = self.train_discount ** jnp.arange(ep_len)[..., jnp.newaxis]
         ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
 
-        @eqx.filter_jit
+        # @eqx.filter_jit # compiling took too long
         @eqx.filter_value_and_grad
         def get_batchified_loss(ode_func, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
+            @eqx.filter_jit
             def get_single_loss(ob: jnp.ndarray, ac: jnp.ndarray, time: jnp.ndarray):
                 assert ob.shape == (ep_len, self.ob_dim)
                 assert ac.shape == (ep_len, self.ac_dim)
@@ -209,6 +211,7 @@ class ODEAgent_Vanilla(eqx.Module):
                     dt0=self.train_timestep,
                     y0=ob[0],
                     args={"times": time, "actions": ac},
+                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                     saveat=diffrax.SaveAt(ts=time)
                 )
                 assert sol.ys.shape == ob.shape == (ep_len, self.ob_dim)
@@ -242,6 +245,7 @@ class ODEAgent_Vanilla(eqx.Module):
                     dt0=self.mpc_timestep,
                     y0=ob,
                     args={"times": times, "actions": ac},
+                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                     saveat=diffrax.SaveAt(ts=times)
                 )
                 rewards, _ = self.env.get_reward_jnp(ode_out.ys, ac)

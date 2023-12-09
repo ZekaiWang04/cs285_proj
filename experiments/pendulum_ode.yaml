@@ -27,7 +27,7 @@ cem_alpha: 1
 mlp_dynamics_setup:
   hidden_size: 128
   num_layers: 4
-  activation: relu
+  activation: tanh
   output_activation: identity
 
 train_timestep: 0.005

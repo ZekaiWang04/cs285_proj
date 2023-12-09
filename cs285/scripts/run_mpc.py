@@ -4,7 +4,7 @@ from typing import Optional
 from matplotlib import pyplot as plt
 from cs285.agents.model_based_agent import ModelBasedAgent
 from cs285.infrastructure.replay_buffer import ReplayBufferTransitions
-
+from cs285.agents.utils import save_leaves, load_leaves
 import os
 import time
 
@@ -23,8 +23,9 @@ import argparse
 
 
 def run_training_loop_mpc(
-    config: dict, agent_name: str, logger: Logger, args: argparse.Namespace
+    config: dict, agent_name: str, logger: Logger, args: argparse.Namespace, log_dir: str
 ):
+    checkpoint_dir= os.path.join(log_dir, "checkpoint")
     assert agent_name == "mpc"
     # set random seeds
     np.random.seed(args.seed)
@@ -108,6 +109,8 @@ def run_training_loop_mpc(
                 loss = mb_agent.batched_update(i, batch["observations"], batch["actions"], batch["next_observations"], batch["dts"])
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))
+
+        save_leaves(mb_agent, checkpoint_dir)
 
         # on iteration 0, plot the full learning curve
         if itr == 0:

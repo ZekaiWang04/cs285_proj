@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
-from diffrax import diffeqsolve
+from diffrax import diffeqsolve, Dopri5, PIDController
 
 def angle_normalize(x):
     return ((x + jnp.pi) % (2 * jnp.pi)) - jnp.pi
@@ -114,6 +114,7 @@ class ODEAgent_True_Dynamics(ODEAgent):
                 dt0=self.mpc_timestep,
                 y0=obs,
                 args={"times": times, "actions": ac},
+                stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
                 saveat=diffrax.SaveAt(ts=times)
             )
             rewards, _ = self.env.get_reward_jnp(ode_out.ys, ac)
