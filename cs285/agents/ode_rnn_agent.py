@@ -20,8 +20,8 @@ _str_to_activation = {
     "identity": lambda x: x,
 }
 
-class GRU_RNN(eqx.Module):
-    gru_cell: eqx.nn.GRUCell
+class ODE_RNN(eqx.Module):
+    rnn_cell: eqx.Module
     mlp_dynamics: eqx.nn.MLP
     mlp_ob_encoder: eqx.nn.MLP
     mlp_ob_decoder: eqx.nn.MLP
@@ -29,6 +29,7 @@ class GRU_RNN(eqx.Module):
 
     def __init__(
             self,
+            rnn_type: str,
             mlp_dynamics_setup: dict,
             mlp_ob_encoder_setup: dict,
             mlp_ob_decoder_setup: dict,
@@ -67,11 +68,19 @@ class GRU_RNN(eqx.Module):
             final_activation=_str_to_activation[mlp_ob_decoder_setup["output_activation"]],
             key=ob_decoder_key
         )
-        self.gru_cell = eqx.nn.GRUCell(
-            input_size=ac_dim,
-            hidden_size=latent_dim,
-        )
         self.dt0 = dt0
+        if rnn_type == "gru":
+            self.rnn_cell = eqx.nn.GRUCell(
+                input_size=ac_dim,
+                hidden_size=latent_dim,
+            )
+        elif rnn_type == "lstm":
+            self.rnn_cell = eqx.nn.LSTMCell(
+                input_size=ac_dim,
+                hidden_size=latent_dim,
+            )
+
+
 
     @eqx.filter_jit
     def __call__(self, ob: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
@@ -80,7 +89,7 @@ class GRU_RNN(eqx.Module):
         # times: (ep_len,)
         # returns obs_predicted: (ep_len, ob_dim)
         latent = self.mlp_ob_encoder(ob) # (latent_dim,)
-        latent = self.gru_cell(acs[0], latent) # (latent_dim,)
+        latent = self.rnn_cell(acs[0], latent) # (latent_dim,)
 
         def step(latent, ac_dt):
             # latent: (latent_dim,)
@@ -97,7 +106,7 @@ class GRU_RNN(eqx.Module):
                 saveat=diffrax.SaveAt(ts=[dt])
             )
             latent = ode_out.ys[0]
-            latent = self.gru_cell(ac, latent)
+            latent = self.rnn_cell(ac, latent)
             return latent, latent
         
         dts = jnp.diff(times)[..., jnp.newaxis] # (ep_len-1, 1)
@@ -107,7 +116,7 @@ class GRU_RNN(eqx.Module):
         return obs_predicted
 
 
-class ODE_GRU_Agent(ODEAgent_Vanilla):
+class ODE_RNN_Agent(ODEAgent_Vanilla):
     # https://arxiv.org/pdf/1907.03907.pdf
     env: gym.Env
     train_timestep: float
@@ -134,11 +143,12 @@ class ODE_GRU_Agent(ODEAgent_Vanilla):
         self,
         env: gym.Env,
         key: jax.random.PRNGKey,
+        rnn_type: str,
         latent_dim: int,
         mlp_dynamics_setup: dict,
         mlp_ob_encoder_setup: dict,
         mlp_ob_decoder_setup: dict,
-        grurnn_dt0: float,
+        odernn_dt0: float,
         optimizer_name: str,
         optimizer_kwargs: dict,
         ensemble_size: int,
@@ -176,14 +186,15 @@ class ODE_GRU_Agent(ODEAgent_Vanilla):
         self.latent_dim = latent_dim
         keys = jax.random.split(key, ensemble_size)
         self.ode_functions = [
-            GRU_RNN(
+            ODE_RNN(
+                rnn_type=rnn_type,
                 mlp_dynamics_setup=mlp_dynamics_setup,
                 mlp_ob_encoder_setup=mlp_ob_encoder_setup,
                 mlp_ob_decoder_setup=mlp_ob_decoder_setup,
                 ob_dim=self.ob_dim,
                 ac_dim=self.ac_dim,
                 latent_dim=latent_dim,
-                dt0=grurnn_dt0,
+                dt0=odernn_dt0,
                 key=keys[n]
             ) for n in range(ensemble_size)
         ]
