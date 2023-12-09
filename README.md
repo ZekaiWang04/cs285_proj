@@ -7,6 +7,8 @@ This is a tracking document for our final project
 
 Be careful of dt
 
+After setting timestep_controller in diffeqsolve, training speed increased dramatically, so it might be that the PIDController makes solver less accurate?
+
 ##Now testing, but beware baselines might need pytorch to run!## Jaxify everything and then we can ditch ptu and torch.
 
 Examine why on the notebook training is lightning speed while on the script it takes so long ("solution": use jupyter notebooks to do experiments!!!)

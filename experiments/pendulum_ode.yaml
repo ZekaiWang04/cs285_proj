@@ -32,8 +32,8 @@ mlp_dynamics_setup:
 
 train_timestep: 0.005
 train_discount: 1.0
-train_ep_len: 200
-train_stride: 1
+train_ep_len: 50
+train_stride: 10
 
 initial_trajs: 100
 trajs: 100
