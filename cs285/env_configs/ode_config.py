@@ -11,12 +11,19 @@ default_mlp_setup = {
     "output_activation": "identity",
 }
 
+default_neural_ode_kwargs = {
+    "ode_dt0": 0.005, 
+    "neural_ode_kwargs": default_mlp_setup
+}
+
 def ode_config(
     env_name: str,
     exp_name: str,
     key: int = 0,
     dt_sampler_name: str = "constant",
     dt_sampler_kwargs: dict={"dt": 0.05},
+    neural_ode_name: str = "vanilla",
+    neural_ode_kwargs: dict = default_neural_ode_kwargs,
     optimizer_name: str = "adamw",
     optimizer_kwargs: dict = {"lr": 1e-3},
     ensemble_size: int = 3,
@@ -26,7 +33,6 @@ def ode_config(
     mpc_num_action_sequences: int = 1000,
     mpc_dt_sampler_name: str = "constant",
     mpc_dt_sampler_kwargs: dict = {"dt": 0.05},
-    mpc_timestep: float = 0.05,
     cem_num_iters: Optional[int] = None,
     cem_num_elites: Optional[int] = None,
     cem_alpha: Optional[float] = None,
@@ -37,8 +43,6 @@ def ode_config(
     replay_buffer_capacity: int = 1000,
     num_agent_train_steps_per_iter: int = 100,
     num_eval_trajectories: int = 10,
-    mlp_dynamics_setup: dict = default_mlp_setup,
-    train_timestep: float = 0.005,
     train_discount: float = 1.0,
     train_ep_len: int=200,
     train_stride: int=1
@@ -72,18 +76,17 @@ def ode_config(
     return {
         "agent_kwargs": {
             "key": agent_key,
-            "mlp_dynamics_setup": mlp_dynamics_setup,
+            "neural_ode_name": neural_ode_name,
+            "neural_ode_kwargs": neural_ode_kwargs,
             "optimizer_name": optimizer_name,
             "optimizer_kwargs": optimizer_kwargs,
             "ensemble_size": ensemble_size,
-            "train_timestep": train_timestep,
             "train_discount": train_discount,
             "mpc_horizon_steps": mpc_horizon_steps,
             "mpc_discount": mpc_discount,
             "mpc_strategy": mpc_strategy,
             "mpc_num_action_sequences": mpc_num_action_sequences,
             "mpc_dt_sampler": mpc_dt_sampler,
-            "mpc_timestep": mpc_timestep,
             "cem_num_iters": cem_num_iters,
             "cem_num_elites": cem_num_elites,
             "cem_alpha": cem_alpha,

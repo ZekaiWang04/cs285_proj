@@ -3,7 +3,7 @@ import time
 from typing import Optional
 from matplotlib import pyplot as plt
 from cs285.agents.utils import save_leaves, load_leaves
-from cs285.agents.ode_agent import ODEAgent_Vanilla
+from cs285.agents.ode_agent import ODEAgent
 from cs285.infrastructure.replay_buffer import ReplayBufferTrajectories
 
 import os
@@ -51,7 +51,7 @@ def run_training_loop_ode(
         fps = 2
 
     # initialize agent
-    mb_agent = ODEAgent_Vanilla(env, **config["agent_kwargs"])
+    mb_agent = ODEAgent(env, **config["agent_kwargs"])
     replay_buffer = ReplayBufferTrajectories(seed=args.seed, capacity=config["replay_buffer_capacity"])
     actor_agent = mb_agent
 

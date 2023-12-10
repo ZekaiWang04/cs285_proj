@@ -191,10 +191,12 @@ class PendulumEnv(gym.Env):
             observations = np.expand_dims(observations, axis=0)
             actions = np.expand_dims(actions, axis=0)
             batch_mode = False
+        else:
+            batch_mode = True
         # get vars
         assert observations.shape[:-1] == actions.shape[:-1]
         assert observations.shape[-1] == 3
-        assert observations.shape[-1] == 1
+        assert actions.shape[-1] == 1
         cos_theta = observations[..., 0]
         sin_theta = observations[..., 1]
         theta_dot = observations[..., 2]

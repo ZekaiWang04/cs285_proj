@@ -39,7 +39,7 @@ class ODEAgent(eqx.Module):
         env: gym.Env,
         key: jax.random.PRNGKey,
         neural_ode_name: str,
-        neural_ode_kwargs: dict, # without key
+        neural_ode_kwargs: dict, # without key, ob_dim, ac_dim
         optimizer_name: str,
         optimizer_kwargs: dict,
         ensemble_size: int,
@@ -81,8 +81,10 @@ class ODEAgent(eqx.Module):
         self.ensemble_size = ensemble_size
         keys = jax.random.split(key, ensemble_size)
         neural_ode_class = _neural_odes[neural_ode_name]
-        self.neural_odes = [NeuralODE_Vanilla(
-            key = keys[n],
+        self.neural_odes = [neural_ode_class(
+            key=keys[n],
+            ob_dim=self.ob_dim,
+            ac_dim=self.ac_dim,
             **neural_ode_kwargs
             ) for n in range(ensemble_size)
         ]
