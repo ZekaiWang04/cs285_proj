@@ -4,98 +4,62 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import diffrax
-from diffrax import diffeqsolve, Dopri5, PIDController
+from diffrax import diffeqsolve, PIDController
 import optax
 from cs285.envs.dt_sampler import BaseSampler
-
-_str_to_activation = {
-    "relu": jax.nn.relu,
-    "tanh": jax.nn.tanh,
-    "leaky_relu": jax.nn.leaky_relu,
-    "sigmoid": jax.nn.sigmoid,
-    "selu": jax.nn.selu,
-    "softplus": jax.nn.softplus,
-    "identity": lambda x: x,
+from cs285.agents.nueral_ode import Base_NeuralODE, NeuralODE_Vanilla, NeuralODE_Augmented, NeuralODE_Latent_MLP, ODE_RNN
+    
+_neural_odes = {
+    "vanilla": NeuralODE_Vanilla,
+    "augmented": NeuralODE_Augmented,
+    "latent_mlp": NeuralODE_Latent_MLP,
+    "ode_rnn": ODE_RNN
 }
 
-class NeuralODE_Vanilla(eqx.Module):
-    mlp: eqx.nn.MLP
-    def __init__(
-            self,
-            mlp_dynamics_setup: dict,
-            ob_dim: int,
-            ac_dim: int,
-            key: jax.random.PRNGKey,
-        ):
-        super().__init__()
-        self.mlp = eqx.nn.MLP(in_size=ob_dim+ac_dim,
-                              out_size=ob_dim,
-                              width_size=mlp_dynamics_setup["hidden_size"],
-                              depth=mlp_dynamics_setup["num_layers"],
-                              activation=_str_to_activation[mlp_dynamics_setup["activation"]],
-                              final_activation=_str_to_activation[mlp_dynamics_setup["output_activation"]],
-                              key=key)
-
-    @eqx.filter_jit
-    def __call__(self, t, y, args):
-        # args is a dictionary that contains times and actions
-        times = args["times"] # (ep_len,)
-        actions = args["actions"] # (ep_len, ac_dim)
-        idx = jnp.searchsorted(times, t, side="right") - 1
-        action = actions[idx] # (ac_dim,)
-        # althoug I believe this should also work for batched
-        return self.mlp(jnp.concatenate((y, action), axis=-1))
-    
-class ODEAgent_Vanilla(eqx.Module):
+class ODEAgent(eqx.Module):
     env: gym.Env
-    train_timestep: float
     train_discount: float
     mpc_horizon_steps: int
     mpc_discount: float
     mpc_strategy: str
     mpc_num_action_sequences: int
     mpc_dt_sampler: BaseSampler
-    mpc_timestep: float
     cem_num_iters: int
     cem_num_elites: int
     cem_alpha: float
     ac_dim: int
     ob_dim: int
     ensemble_size: int
-    ode_functions: list
+    neural_odes: list
     optims: list
     optim_states: list
-    solver: Dopri5
 
     def __init__(
         self,
         env: gym.Env,
         key: jax.random.PRNGKey,
-        mlp_dynamics_setup: dict, # contains hidden_size: int, num_layers: int, activation: str, output_activation: str
+        neural_ode_name: str,
+        neural_ode_kwargs: dict, # without key
         optimizer_name: str,
         optimizer_kwargs: dict,
         ensemble_size: int,
-        train_timestep: float,
         train_discount: float,
         mpc_horizon_steps: int,
         mpc_discount: float,
         mpc_strategy: str,
         mpc_num_action_sequences: int,
         mpc_dt_sampler: BaseSampler,
-        mpc_timestep: float,
         cem_num_iters: Optional[int] = None,
         cem_num_elites: Optional[int] = None,
         cem_alpha: Optional[float] = None,
     ):
         self.env = env
-        self.train_timestep = train_timestep
         assert 0 < train_discount <= 1
         self.train_discount = train_discount
         self.mpc_horizon_steps = mpc_horizon_steps # in terms of timesteps
         assert 0 < mpc_discount <= 1
         self.mpc_discount = mpc_discount
         self.mpc_strategy = mpc_strategy
-        self.mpc_timestep = mpc_timestep
         self.mpc_num_action_sequences = mpc_num_action_sequences
         self.cem_num_iters = cem_num_iters
         self.cem_num_elites = cem_num_elites
@@ -116,74 +80,15 @@ class ODEAgent_Vanilla(eqx.Module):
 
         self.ensemble_size = ensemble_size
         keys = jax.random.split(key, ensemble_size)
-        self.ode_functions = [NeuralODE_Vanilla(
-            mlp_dynamics_setup=mlp_dynamics_setup,
-            ob_dim=self.ob_dim,
-            ac_dim=self.ac_dim,
-            key = keys[n]
-            ) for n in range(ensemble_size)]
+        neural_ode_class = _neural_odes[neural_ode_name]
+        self.neural_odes = [NeuralODE_Vanilla(
+            key = keys[n],
+            **neural_ode_kwargs
+            ) for n in range(ensemble_size)
+        ]
         optimizer_class = getattr(optax, optimizer_name)
         self.optims = [optimizer_class(**optimizer_kwargs) for _ in range(ensemble_size)]
-        self.optim_states = [self.optims[n].init(eqx.filter(self.ode_functions[n], eqx.is_array)) for n in range(self.ensemble_size)]
-
-        self.solver = Dopri5()
-    
-    # I believe only jitting the top level function should work...
-    # need testing/reading to support this "conjecture"
-    @DeprecationWarning
-    def update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
-        """
-        Update self.dynamics_models[i] using the given trajectory
-
-        Args:
-            i: index of the dynamics model to update
-            obs: (ep_len, ob_dim)
-            acs: (ep_len, ac_dim)
-            times: (ep_len)
-        """
-        # TODO: add discount, train_length
-        # Note: the discount will mess with the loss, so if we want to 
-        # compare "training" effect with different discount, we can't 
-        # really do that
-
-        # TODO: for some reason, this function is an order of magnitude
-        # slower than the batched_update function below. For now I have
-        # deperacated this function in favor of the one below.
-        ep_len = obs.shape[0]
-        assert obs.shape == (ep_len, self.ob_dim)
-        assert acs.shape == (ep_len, self.ac_dim)
-        assert times.shape == (ep_len,)
-
-        discount_array = self.train_discount ** jnp.arange(ep_len)[..., jnp.newaxis]
-
-        @eqx.filter_jit
-        @eqx.filter_value_and_grad
-        def loss_grad(ode_func):
-            sol = diffeqsolve(
-                terms=diffrax.ODETerm(ode_func),
-                solver=self.solver, 
-                t0=times[0], 
-                t1=times[-1],
-                dt0=self.train_timestep,
-                y0 = obs[0, :],
-                args={"times": times, "actions": acs},
-                stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
-                saveat=diffrax.SaveAt(ts=times)
-            )
-            assert sol.ys.shape == obs.shape == (ep_len, self.ob_dim)
-            return jnp.mean(discount_array * (sol.ys - obs) ** 2) # do we want a  "discount"-like trick
-
-        @eqx.filter_jit
-        def make_step(ode_func, optim, opt_state):
-            loss, grad = loss_grad(ode_func)
-            updates, opt_state = optim.update(grad, opt_state, ode_func)
-            ode_func = eqx.apply_updates(ode_func, updates)
-            return loss, ode_func, opt_state
-        
-        ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
-        loss, ode_func, opt_state = make_step(ode_func, optim, opt_state)
-        self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
-        return loss.item()
+        self.optim_states = [self.optims[n].init(eqx.filter(self.neural_odes[n], eqx.is_array)) for n in range(self.ensemble_size)]
 
     def batched_update(self, i: int, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
         batch_size, ep_len = times.shape[0], times.shape[1]
@@ -191,37 +96,21 @@ class ODEAgent_Vanilla(eqx.Module):
         assert obs.shape == (batch_size, ep_len, self.ob_dim)
         assert acs.shape == (batch_size, ep_len, self.ac_dim)
 
-        discount_array = self.train_discount ** jnp.arange(ep_len)[..., jnp.newaxis]
-        ode_func, optim, opt_state = self.ode_functions[i], self.optims[i], self.optim_states[i]
+        discount_array = self.train_discount ** jnp.arange(ep_len) # (ep_len,)
+        neural_ode, optim, opt_state = self.neural_odes[i], self.optims[i], self.optim_states[i]
 
-        # @eqx.filter_jit # compiling took too long
+        @eqx.filter_jit
         @eqx.filter_value_and_grad
-        def get_batchified_loss(ode_func, obs: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
-            @eqx.filter_jit
-            def get_single_loss(ob: jnp.ndarray, ac: jnp.ndarray, time: jnp.ndarray):
-                assert ob.shape == (ep_len, self.ob_dim)
-                assert ac.shape == (ep_len, self.ac_dim)
-                assert time.shape == (ep_len,)
-                sol = diffeqsolve(
-                    terms=diffrax.ODETerm(ode_func),
-                    solver=self.solver,
-                    t0=time[0],
-                    t1=time[-1],
-                    dt0=self.train_timestep,
-                    y0=ob[0],
-                    args={"times": time, "actions": ac},
-                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
-                    saveat=diffrax.SaveAt(ts=time)
-                )
-                assert sol.ys.shape == ob.shape == (ep_len, self.ob_dim)
-                return jnp.mean(discount_array * (sol.ys - ob) ** 2)
-            losses = jax.vmap(get_single_loss)(obs, acs, times)
-            return jnp.mean(losses)
+        def get_loss(neural_ode, obs, acs, times):
+            obs_pred = neural_ode.batched_pred(ob=obs[:, 0, :], acs=acs, times=times)
+            l2_losses = jnp.sum((obs - obs_pred) ** 2, axis=-1) # (batch_size, ep_len)
+            weighed_mse = jnp.mean(discount_array * l2_losses)
+            return weighed_mse
         
-        loss, grad = get_batchified_loss(ode_func, obs, acs, times)
-        updates, opt_state = optim.update(grad, opt_state, ode_func)
-        ode_func = eqx.apply_updates(ode_func, updates)
-        self.ode_functions[i], self.optim_states[i] = ode_func, opt_state
+        loss, grad = get_loss(neural_ode, obs, acs, times)
+        updates, opt_state = optim.update(grad, opt_state, neural_ode)
+        neural_ode = eqx.apply_updates(neural_ode, updates)
+        self.neural_odes[i], self.optim_states[i] = neural_ode, opt_state
         return loss.item()
 
     @eqx.filter_jit
@@ -231,28 +120,19 @@ class ODEAgent_Vanilla(eqx.Module):
         # mpc_discount_arr: (mpc_horizon_steps,)
         dts = self.mpc_dt_sampler.get_dt(size=(self.mpc_horizon_steps,))
         times = jnp.cumsum(dts) # (self.mpc_horizon_steps, )
-
-        def evaluate_single_sequence(ac):
-            avg_rewards = jnp.zeros((self.ensemble_size,))
-            for i in range(self.ensemble_size):
-                ode_func = self.ode_functions[i]
-                ode_out = diffeqsolve(
-                    terms=diffrax.ODETerm(ode_func),
-                    solver=self.solver,
-                    t0=times[0],
-                    t1=times[-1],
-                    dt0=self.mpc_timestep,
-                    y0=ob,
-                    args={"times": times, "actions": ac},
-                    stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
-                    saveat=diffrax.SaveAt(ts=times)
-                )
-                rewards, _ = self.env.get_reward_jnp(ode_out.ys, ac)
-                avg_rewards.at[i].set(jnp.mean(rewards * mpc_discount_arr))
-            return jnp.mean(avg_rewards)
-        
-        avg_rewards = jax.vmap(evaluate_single_sequence)(acs) # (seqs,)
-        assert avg_rewards.shape == (self.mpc_num_action_sequences,)
+        avg_rewards_ensembled = jnp.zeros((self.ensemble_size, self.mpc_num_action_sequences))
+        for i in range(self.ensemble_size):
+            neural_ode = self.neural_odes[i]
+            obs_pred = neural_ode.batched_pred(
+                ob=jnp.tile(ob, (self.mpc_num_action_sequences, 1)), 
+                acs=acs, 
+                times=jnp.tile(times, (self.mpc_num_action_sequences, 1))
+            ) # TODO: is vmap and neural_ode.sigle_pred faster?
+            rewards, _ = self.env.get_reward_jnp(obs_pred, acs)
+            assert rewards.shape == (self.mpc_num_action_sequences, self.mpc_horizon_steps)
+            avg_rewards_ensembled.at[i].set(jnp.mean(rewards * mpc_discount_arr, axis=-1))
+        avg_rewards = jnp.mean(avg_rewards_ensembled, axis=0) # (mpc_num_action_sequences,)
+        assert avg_rewards.shape == (self.mpc_num_action_sequences,)                                             
         return avg_rewards
 
     @eqx.filter_jit

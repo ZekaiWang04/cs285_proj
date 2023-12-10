@@ -188,20 +188,19 @@ class PendulumEnv(gym.Env):
     def get_reward_jnp(self, observations: jnp.ndarray, actions: jnp.ndarray):
         self.reward_dict = {}
         if len(observations.shape) == 1:
-            observations = jnp.expand_dims(observations, axis=0)
-            actions = jnp.expand_dims(actions, axis=0)
+            observations = np.expand_dims(observations, axis=0)
+            actions = np.expand_dims(actions, axis=0)
             batch_mode = False
-        else:
-            batch_mode = True
-        
         # get vars
-        cos_theta = observations[:, 0]
-        sin_theta = observations[:, 1]
-        theta_dot = observations[:, 2]
-        u = actions.squeeze()
-        assert u.shape == (observations.shape[0],), f"u.shape={u.shape}, observations.shape={observations.shape}"
+        assert observations.shape[:-1] == actions.shape[:-1]
+        assert observations.shape[-1] == 3
+        assert observations.shape[-1] == 1
+        cos_theta = observations[..., 0]
+        sin_theta = observations[..., 1]
+        theta_dot = observations[..., 2]
+        u = actions[..., 0]
         # calc rew
-        rewards = -(angle_normalize(jnp.arctan2(sin_theta, cos_theta)) ** 2 + 0.1 * theta_dot**2 + 0.001 * (u**2))
+        rewards = -(angle_normalize_jnp(jnp.arctan2(sin_theta, cos_theta)) ** 2 + 0.1 * theta_dot**2 + 0.001 * (u**2))
 
         # done is always false for this env
         dones = jnp.zeros((observations.shape[0],))
@@ -342,3 +341,6 @@ class PendulumEnv(gym.Env):
 
 def angle_normalize(x):
     return ((x + np.pi) % (2 * np.pi)) - np.pi
+
+def angle_normalize_jnp(x):
+    return ((x + jnp.pi) % (2 * jnp.pi)) - jnp.pi
