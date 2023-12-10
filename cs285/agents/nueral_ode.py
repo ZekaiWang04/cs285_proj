@@ -424,3 +424,5 @@ class ODE_RNN(Base_NeuralODE):
         latents = jnp.concatenate([latent[jnp.newaxis, ...], latents], axis=0) # (ep_len, latent_dim)
         obs_predicted = jax.vmap(self.mlp_ob_decoder)(latents) # (ep_len, ob_dim)
         return obs_predicted
+    
+# TODO: Maybe Conditional VAE approach, but don't think this is too natural
