@@ -215,7 +215,7 @@ class NeuralODE_Augmented(Base_NeuralODE):
         actions = args["actions"] # (ep_len, ac_dim)
         idx = jnp.searchsorted(times, t, side="right") - 1
         action = actions[idx] # (ac_dim,)
-        return self.mlp((y, action), axis=-1)
+        return self.mlp(jnp.concatenate((y, action), axis=-1))
     
     @eqx.filter_jit
     def single_pred(self, ob: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
@@ -311,7 +311,7 @@ class NeuralODE_Latent_MLP(Base_NeuralODE):
         ac_latents = args["ac_latents"] # (ep_len, ac_latent_dim)
         idx = jnp.searchsorted(times, t, side="right") - 1
         ac_latent = ac_latents[idx] # (ac_latent_dim,)
-        return self.mlp((y, ac_latent), axis=-1)
+        return self.mlp_dynamics(jnp.concatenate((y, ac_latent), axis=-1))
     
     @eqx.filter_jit
     def single_pred(self, ob: jnp.ndarray, acs: jnp.ndarray, times: jnp.ndarray):
@@ -343,6 +343,8 @@ class ODE_RNN(Base_NeuralODE):
     mlp_ob_encoder: eqx.nn.MLP
     mlp_ob_decoder: eqx.nn.MLP
     ode_dt0: float
+    rnn_type: str
+    latent_dim: int
 
     def __init__(
         self,
@@ -358,25 +360,7 @@ class ODE_RNN(Base_NeuralODE):
     ):
         super().__init__()
         # each mlp_..._setup should contain hidden_size: int, num_layers: int, activation: str, output_activation: str
-        dynamics_key, ob_ac_encoder_key, ob_decoder_key = jax.random.split(key, 3)
-        self.mlp_dynamics = eqx.nn.MLP(
-            in_size=latent_dim,
-            out_size=latent_dim,
-            width_size=mlp_dynamics_setup["hidden_size"],
-            depth=mlp_dynamics_setup["num_layers"],
-            activation=_str_to_activation[mlp_dynamics_setup["activation"]],
-            final_activation=_str_to_activation[mlp_dynamics_setup["output_activation"]],
-            key=dynamics_key
-        )
-        self.mlp_ob_encoder = eqx.nn.MLP(
-            in_size=ob_dim,
-            out_size=latent_dim,
-            width_size=mlp_ob_encoder_setup["hidden_size"],
-            depth=mlp_ob_encoder_setup["num_layers"],
-            activation=_str_to_activation[mlp_ob_encoder_setup["activation"]],
-            final_activation=_str_to_activation[mlp_ob_encoder_setup["output_activation"]],
-            key=ob_ac_encoder_key
-        )
+        dynamics_key, ob_ac_encoder_key, ob_decoder_key, rnn_key = jax.random.split(key, 4)
         self.mlp_ob_decoder = eqx.nn.MLP(
             in_size=latent_dim,
             out_size=ob_dim,
@@ -386,17 +370,42 @@ class ODE_RNN(Base_NeuralODE):
             final_activation=_str_to_activation[mlp_ob_decoder_setup["output_activation"]],
             key=ob_decoder_key
         )
+        self.latent_dim = latent_dim
         self.ode_dt0 = ode_dt0
+        self.rnn_type = rnn_type
         if rnn_type == "gru":
             self.rnn_cell = eqx.nn.GRUCell(
                 input_size=ac_dim,
                 hidden_size=latent_dim,
+                key=rnn_key
             )
+            total_hidden_dims = latent_dim
         elif rnn_type == "lstm":
             self.rnn_cell = eqx.nn.LSTMCell(
                 input_size=ac_dim,
                 hidden_size=latent_dim,
+                key=rnn_key
             )
+            total_hidden_dims = 2 * latent_dim
+
+        self.mlp_ob_encoder = eqx.nn.MLP(
+            in_size=ob_dim,
+            out_size=total_hidden_dims,
+            width_size=mlp_ob_encoder_setup["hidden_size"],
+            depth=mlp_ob_encoder_setup["num_layers"],
+            activation=_str_to_activation[mlp_ob_encoder_setup["activation"]],
+            final_activation=_str_to_activation[mlp_ob_encoder_setup["output_activation"]],
+            key=ob_ac_encoder_key
+        )
+        self.mlp_dynamics = eqx.nn.MLP(
+            in_size=total_hidden_dims,
+            out_size=total_hidden_dims,
+            width_size=mlp_dynamics_setup["hidden_size"],
+            depth=mlp_dynamics_setup["num_layers"],
+            activation=_str_to_activation[mlp_dynamics_setup["activation"]],
+            final_activation=_str_to_activation[mlp_dynamics_setup["output_activation"]],
+            key=dynamics_key
+        )
 
 
     @eqx.filter_jit
@@ -405,11 +414,26 @@ class ODE_RNN(Base_NeuralODE):
         # acs: (ep_len, ac_dim)
         # times: (ep_len,)
         # returns obs_predicted: (ep_len, ob_dim)
-        latent = self.mlp_ob_encoder(ob) # (latent_dim,)
-        latent = self.rnn_cell(acs[0], latent) # (latent_dim,)
 
+        # lstm: (h, c) is passed in to the cell as latents, h is the output
+        def call_rnn(ac, latent):
+            # ac: (ac_dim,)
+            # latent: (total_hidden_dims,)
+            # output: new_latent (total_hidden_dims,)
+            if self.rnn_type == "gru":
+                new_latent = self.rnn_cell(ac, latent)
+            elif self.rnn_type == "lstm":
+                latents = (latent[:self.latent_dim], latent[-self.latent_dim:])
+                new_latents = self.rnn_cell(ac, latents)
+                new_latent = jnp.concatenate(new_latents, axis=-1)
+            else:
+                raise NotImplementedError
+            return new_latent
+        
+        latent = self.mlp_ob_encoder(ob) # (total_hidden_dim,)
+        latent = call_rnn(acs[0], latent) # (total_hidden_dim,)
         def step(latent, ac_dt):
-            # latent: (latent_dim,)
+            # latent: (total_hidden_dim,)
             # ac_dt: (ac_dim + 1,)
             ac, dt = ac_dt[:-1], ac_dt[-1]
             ode_out = diffeqsolve(
@@ -423,13 +447,16 @@ class ODE_RNN(Base_NeuralODE):
                 saveat=diffrax.SaveAt(ts=[dt])
             )
             latent = ode_out.ys[0]
-            latent = self.rnn_cell(ac, latent)
+            latent = call_rnn(ac, latent)
             return latent, latent
         
         dts = jnp.diff(times)[..., jnp.newaxis] # (ep_len-1, 1)
         _, latents = scan(step, latent, jnp.concatenate([acs[1:], dts], axis=-1))
-        latents = jnp.concatenate([latent[jnp.newaxis, ...], latents], axis=0) # (ep_len, latent_dim)
+        if self.rnn_type == "gru":
+            latents = jnp.concatenate([latent[jnp.newaxis, ...], latents], axis=0) # (ep_len, latent_dim)
+        elif self.rnn_type == "lstm":
+            latents = jnp.concatenate([latent[jnp.newaxis, :self.latent_dim], latents[:, :self.latent_dim]], axis=0) # (ep_len, latent_dim)
+        else:
+            raise NotImplementedError
         obs_predicted = jax.vmap(self.mlp_ob_decoder)(latents) # (ep_len, ob_dim)
         return obs_predicted
-    
-# TODO: Maybe Conditional VAE approach, but don't think this is too natural
