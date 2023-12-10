@@ -7,10 +7,11 @@ import diffrax
 from diffrax import diffeqsolve, PIDController
 import optax
 from cs285.envs.dt_sampler import BaseSampler
-from cs285.agents.nueral_ode import Base_NeuralODE, NeuralODE_Vanilla, NeuralODE_Augmented, NeuralODE_Latent_MLP, ODE_RNN
+from cs285.agents.nueral_ode import Base_NeuralODE, NeuralODE_Vanilla, Pendulum_True_Dynamics, NeuralODE_Augmented, NeuralODE_Latent_MLP, ODE_RNN
     
 _neural_odes = {
     "vanilla": NeuralODE_Vanilla,
+    "pendulum_true_dynamics": Pendulum_True_Dynamics,
     "augmented": NeuralODE_Augmented,
     "latent_mlp": NeuralODE_Latent_MLP,
     "ode_rnn": ODE_RNN
