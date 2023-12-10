@@ -4,6 +4,7 @@ from jax.lax import scan
 import equinox as eqx
 import diffrax
 from diffrax import diffeqsolve, Dopri5, PIDController, ODETerm
+from typing import Optional
 
 _str_to_activation = {
     "relu": jax.nn.relu,
@@ -110,12 +111,18 @@ class NeuralODE_Vanilla(Base_NeuralODE):
 
 class Pendulum_True_Dynamics(Base_NeuralODE):
     ode_dt0: float
-    def __init__(self, ode_dt0: float):
+    def __init__(
+        self,         
+        ob_dim: Optional[int]=None,
+        ac_dim: Optional[int]=None,
+        ode_dt0: Optional[float]=None,
+        key: Optional[jax.random.PRNGKey]=None,
+    ):
         super().__init__()
         self.ode_dt0 = ode_dt0
     
     @eqx.filter_jit
-    def _angle_normalize(x):
+    def _angle_normalize(self, x):
         return ((x + jnp.pi) % (2 * jnp.pi)) - jnp.pi
     
     @eqx.filter_jit
