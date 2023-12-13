@@ -52,7 +52,7 @@ def run_training_loop_ode(
 
     # initialize agent
     mb_agent = ODEAgent(env, **config["agent_kwargs"])
-    replay_buffer = ReplayBufferTrajectories(seed=args.seed, capacity=config["replay_buffer_capacity"])
+    replay_buffer = ReplayBufferTrajectories(capacity=config["replay_buffer_capacity"])
     actor_agent = mb_agent
 
     total_envsteps = 0
@@ -95,7 +95,8 @@ def run_training_loop_ode(
         ):
             step_losses = []
             for i in range(mb_agent.ensemble_size):
-                traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"])
+                sample_key, key = jax.random.split(key)
+                traj = replay_buffer.sample_rollouts(batch_size=config["train_batch_size"], key=sample_key)
                 obs = utils.split_arr(np.array(traj["observations"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
                 acs = utils.split_arr(np.array(traj["actions"]), length=config["train_ep_len"], stride=config["train_stride"]) # (batch_size, num_splitted, train_ep_len, dims)
                 dts = utils.split_arr(np.array(traj["dts"])[..., np.newaxis], length=config["train_ep_len"], stride=config["train_stride"]).squeeze(-1) # (batch_size, num_splitted, train_ep_len)
