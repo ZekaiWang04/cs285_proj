@@ -42,6 +42,8 @@ def mpc_config(
     if env_name == "pendulum-cs285-v0":
         ep_len = 200
 
+    dt_key, key = jax.random.split(key)
+    dt_sampler_kwargs["key"] = dt_key
     dt_sampler = {"constant": ConstantSampler,
                   "uniform": UniformSampler,
                   "exponential": ExponentialSampler}[dt_sampler_name](**dt_sampler_kwargs)
@@ -52,6 +54,8 @@ def mpc_config(
                      render_mode="single_rgb_array" if render else None),
         )
 
+    dt_key, key = jax.random.split(key)
+    mpc_dt_sampler_kwargs["key"] = dt_key
     mpc_dt_sampler = {"constant": ConstantSampler,
                       "uniform": UniformSampler,
                       "exponential": ExponentialSampler}[mpc_dt_sampler_name](**mpc_dt_sampler_kwargs)
