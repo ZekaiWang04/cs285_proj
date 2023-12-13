@@ -1,5 +1,6 @@
 from cs285.infrastructure.utils import *
-
+import jax
+import jax.numpy as np
 
 class ReplayBufferTransitions:
     def __init__(self, capacity=1000000):
@@ -140,9 +141,8 @@ class ReplayBufferTrajectories():
     # rollouts with different lengths
     # But I can also do something like having a cutoff_length
     # and a auxiliary value indicating how long each rollout is
-    def __init__(self, seed=0, capacity=1000):
+    def __init__(self, capacity=1000):
         self.capacity = capacity
-        self.rng = np.random.default_rng(seed)
         # store each rollout
         self.paths = []
 
@@ -197,9 +197,9 @@ class ReplayBufferTrajectories():
             self.dts.extend(dts)
             self.dts = self.dts[-self.capacity:]
 
-    def sample_rollout(self):
+    def sample_rollout(self, key: jax.random.PRNGKey):
         # samples and returns a single rollout
-        idx = self.rng.integers(low=0, high=len(self))
+        idx = jax.random.randint(key=key, shape=(), minval=0, maxval=len(self))
         return {
             "observations": self.obs[idx],
             "actions": self.acs[idx],
@@ -209,8 +209,8 @@ class ReplayBufferTrajectories():
             "dts": self.dts[idx]
         }
     
-    def sample_rollouts(self, batch_size):
-        indices = self.rng.integers(low=0, high=len(self), size=(batch_size,))
+    def sample_rollouts(self, batch_size, key: jax.random.PRNGKey):
+        indices = jax.random.randint(key=key, shape=(batch_size,), minval=0, maxval=len(self))
         observations, actions, rewards, next_observations, dones, dts = [], [], [], [], [], []
         for idx in indices:
             observations.append(self.obs[idx])
