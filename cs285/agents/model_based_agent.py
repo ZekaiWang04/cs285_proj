@@ -25,7 +25,8 @@ class ModelBasedAgent():
         num_layers: int,
         activation: str,
         output_activation: str,
-        lr: float,
+        optimizer_name: str,
+        optimizer_kwargs: dict,
         ensemble_size: int,
         mpc_horizon_steps: int,
         mpc_discount: float,
@@ -107,8 +108,8 @@ class ModelBasedAgent():
             ]
         else:
             raise Exception
-        
-        self.optims = [optax.adamw(lr) for _ in range(ensemble_size)]
+        optim_class = getattr(optax, optimizer_name)
+        self.optims = [optim_class(**optimizer_kwargs) for _ in range(ensemble_size)]
         self.optim_states = [self.optims[n].init(eqx.filter(self.dynamics_models[n], eqx.is_array)) for n in range(self.ensemble_size)]
         
         self.obs_acs_mean = jnp.zeros(self.ob_dim + self.ac_dim)
