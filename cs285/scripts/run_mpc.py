@@ -105,7 +105,7 @@ def run_training_loop_mpc(
         ):
             step_losses = []
             for i in range(mb_agent.ensemble_size):
-                batch = replay_buffer.sample(config["train_batch_size"])
+                batch = replay_buffer.sample(config["batch_size"])
                 loss = mb_agent.batched_update(i, batch["observations"], batch["actions"], batch["next_observations"], batch["dts"])
                 step_losses.append(loss)
             all_losses.append(np.mean(step_losses))

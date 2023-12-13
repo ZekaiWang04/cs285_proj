@@ -1,0 +1,39 @@
+env_name: pendulum-cs285-v0
+exp_name: pendulum_mpc_dt_in
+
+base_config: mpc
+
+key: 27
+
+dt_sampler_name: constant
+dt_sampler_kwargs:
+  dt: 0.05
+optimizer_name: adamw
+optimizer_kwargs:
+  learning_rate: 0.001
+ensemble_size: 10
+mpc_horizon_steps: 20
+mpc_discount: 0.95
+mpc_strategy: random
+mpc_num_action_sequences: 500
+mpc_dt_sampler_name: constant
+mpc_dt_sampler_kwargs:
+  dt: 0.05
+cem_num_iters: 5
+cem_num_elites: 10
+cem_alpha: 1
+
+initial_batch_size: 5000
+batch_size: 5000
+train_batch_size: 64
+num_iters: 20
+
+replay_buffer_capacity: 1000
+num_agent_train_steps_per_iter: 100
+num_eval_trajectories: 10
+
+hidden_size: 128
+num_layers: 4
+activation: relu
+output_activation: identity
+mode: dt_in

@@ -1,6 +1,7 @@
 from cs285.infrastructure.utils import *
+import numpy as np
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 
 class ReplayBufferTransitions:
     def __init__(self, capacity=1000000):
