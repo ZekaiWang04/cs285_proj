@@ -133,7 +133,7 @@ class ODEAgent(eqx.Module):
             ) # TODO: is vmap and neural_ode.sigle_pred faster?
             rewards, _ = self.env.get_reward_jnp(obs_pred, acs)
             assert rewards.shape == (self.mpc_num_action_sequences, self.mpc_horizon_steps)
-            avg_rewards_ensembled.at[i].set(jnp.mean(rewards * mpc_discount_arr, axis=-1))
+            avg_rewards_ensembled = avg_rewards_ensembled.at[i].set(jnp.mean(rewards * mpc_discount_arr, axis=-1))
         avg_rewards = jnp.mean(avg_rewards_ensembled, axis=0) # (mpc_num_action_sequences,)
         assert avg_rewards.shape == (self.mpc_num_action_sequences,)                                             
         return avg_rewards

@@ -101,7 +101,7 @@ class NeuralODE_Vanilla(Base_NeuralODE):
             dt0=self.ode_dt0,
             y0=ob,
             args={"times": times, "actions": acs},
-            stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
+            stepsize_controller=PIDController(rtol=1e-3, atol=1e-5),
             saveat=diffrax.SaveAt(ts=times)
         )
         obs_pred = sol.ys
@@ -159,8 +159,8 @@ class Pendulum_True_Dynamics(Base_NeuralODE):
             dt0=self.ode_dt0,
             y0=ob,
             args={"times": times, "actions": acs},
-            stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
-            saveat=diffrax.SaveAt(ts=times)
+            # stepsize_controller=PIDController(rtol=1e-3, atol=1e-5),
+            saveat=diffrax.SaveAt(ts=times),
         )
         obs_pred = sol.ys
         return obs_pred
@@ -231,7 +231,7 @@ class NeuralODE_Augmented(Base_NeuralODE):
             dt0=self.ode_dt0,
             y0=jnp.concatenate([ob, self._get_aug_init()], axis=-1), # maybe invalid
             args={"times": times, "actions": acs},
-            stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
+            stepsize_controller=PIDController(rtol=1e-3, atol=1e-5),
             saveat=diffrax.SaveAt(ts=times)
         )
         obs_pred = sol.ys[:, :-self.aug_dim]
@@ -329,7 +329,7 @@ class NeuralODE_Latent_MLP(Base_NeuralODE):
             dt0=self.ode_dt0,
             y0=ob_latent,
             args={"times": times, "ac_latents": ac_latents},
-            stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
+            stepsize_controller=PIDController(rtol=1e-3, atol=1e-5),
             saveat=diffrax.SaveAt(ts=times)
         )
         obs_pred = jax.vmap(self.mlp_ob_decoder)(sol.ys)
@@ -443,7 +443,7 @@ class ODE_RNN(Base_NeuralODE):
                 t1=dt,
                 dt0=self.ode_dt0,
                 y0=latent,
-                stepsize_controller=PIDController(rtol=1e-3, atol=1e-6),
+                stepsize_controller=PIDController(rtol=1e-3, atol=1e-5),
                 saveat=diffrax.SaveAt(ts=[dt])
             )
             latent = ode_out.ys[0]
