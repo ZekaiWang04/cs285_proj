@@ -1,14 +1,13 @@
 env_name: pendulum-cs285-v0
-exp_name: uniform_pendulum_mpc_mul_dt
+exp_name: expon_pendulum_mpc
 
 base_config: mpc
 
 key: 27
 
-dt_sampler_name: uniform
+dt_sampler_name: exponential
 dt_sampler_kwargs:
-  low: 0.0
-  high: 0.1
+  lmbda: 20
 optimizer_name: adamw
 optimizer_kwargs:
   learning_rate: 0.001
@@ -17,10 +16,9 @@ mpc_horizon_steps: 20
 mpc_discount: 0.95
 mpc_strategy: random
 mpc_num_action_sequences: 1000
-mpc_dt_sampler_name: uniform
+mpc_dt_sampler_name: exponential
 mpc_dt_sampler_kwargs:
-  low: 0.0
-  high: 0.1
+  lmbda: 20
 cem_num_iters: 5
 cem_num_elites: 10
 cem_alpha: 1
@@ -38,4 +36,4 @@ hidden_size: 128
 num_layers: 4
 activation: relu
 output_activation: identity
-mode: mul_dt
+mode: vanilla
