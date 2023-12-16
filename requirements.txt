@@ -1,4 +1,4 @@
-jax[cuda12_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+jax
 mujoco==2.2.0
 gym==0.25.2
 tensorboard==2.10.0
